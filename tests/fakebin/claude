@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""A fake `claude` for offline tests: canned structured output, no network, no model.
+
+- `claude auth status --json`: a subscription login, or what FAKE_AUTH_JSON holds.
+- `claude -p ... --json-schema S`: answers by the schema's shape (builder, instructions, judge, verdict, why,
+  check, rewrite).
+- `claude -p ... --output-format stream-json`: a short run log with one search on the provider's MCP.
+Every call appends its argv and the credential variables it saw to $FAKE_CLAUDE_LOG, if set.
+
+Failure knobs (environment):
+- FAKE_USAGE_LIMIT=stream|json|all: that kind of call ends in the subscription usage-limit error.
+- FAKE_MCP_FAIL=<server>: that MCP server fails to connect (with FAKE_MCP_FAIL_ONE=1, only on the first task it
+  sees, every attempt).
+- FAKE_RATE_LIMIT=<server>:<n>: after n calls, that server's tool answers "429 Too Many Requests" (counted in
+  FAKE_COUNTER_DIR).
+- FAKE_FAIL=<schema property>: the structured call whose schema has that property fails.
+- FAKE_BIG=<chars>: each tool result is that long.
+"""
+
+import hashlib
+import json
+import os
+import re
+import sys
+
+args = sys.argv[1:]
+WATCH = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
+         "ANTHROPIC_PROFILE")
+
+
+def log(prompt=""):
+    """Record the call's argv, the credential variables it saw, and the start of its prompt."""
+    if os.environ.get("FAKE_CLAUDE_LOG"):
+        seen = [k for k in os.environ if k in WATCH or k.startswith("CLAUDE_CODE_USE_")]
+        line = json.dumps({"argv": args[:2], "args": args, "env": seen, "prompt": prompt[:120]}) + "\n"
+        # one write on an O_APPEND descriptor: concurrent replays can't interleave their lines, however long
+        fd = os.open(os.environ["FAKE_CLAUDE_LOG"], os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, line.encode())
+        finally:
+            os.close(fd)
+
+
+def opt(name):
+    return args[args.index(name) + 1] if name in args else None
+
+
+def h(s):
+    return int(hashlib.sha256(s.encode()).hexdigest(), 16)
+
+
+if args[:2] == ["auth", "status"]:
+    log()
+    print(os.environ.get("FAKE_AUTH_JSON") or json.dumps({
+        "loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty", "subscriptionType": "max"}))
+    sys.exit(0)
+
+prompt = sys.stdin.read()
+log(prompt)
+ENV = os.environ.get
+LIMIT_TEXT = "Claude AI usage limit reached|1900000000"
+if not prompt.strip():  # as the real CLI does
+    print("Error: Input must be provided either through stdin or as a prompt argument when using --print",
+          file=sys.stderr)
+    sys.exit(1)
+MODEL = "fake-model-1"
+
+if opt("--output-format") == "stream-json":
+    servers = json.load(open(opt("--mcp-config")))["mcpServers"]
+    hit = True
+    if ENV("FAKE_MCP_FAIL_ONE"):  # the first task this server sees fails on every attempt; the others connect
+        doomed = os.path.join(ENV("FAKE_COUNTER_DIR"), "doomed")
+        try:
+            fd = os.open(doomed, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+            os.write(fd, prompt.encode())
+            os.close(fd)
+        except FileExistsError:
+            pass
+        hit = open(doomed).read() == prompt
+    status = {s: ("failed" if ENV("FAKE_MCP_FAIL") == s and hit else "connected") for s in servers}
+    if ENV("FAKE_USAGE_LIMIT") in ("stream", "all"):
+        print(json.dumps({"type": "system", "subtype": "init", "model": MODEL, "tools": [],
+                          "mcp_servers": [{"name": s, "status": st} for s, st in status.items()]}))
+        print(json.dumps({"type": "result", "subtype": "success", "is_error": True, "result": LIMIT_TEXT}))
+        sys.exit(1)
+    short = {"exa": "web_search_exa"}  # the real tool names, so the price table applies
+    up = [s for s in servers if status[s] == "connected"]
+    tool = next((f"mcp__{s}__{short.get(s, 'web_search')}" for s in up), "WebSearch")
+    body = None
+    if ENV("FAKE_RATE_LIMIT") and up:
+        srv, n = ENV("FAKE_RATE_LIMIT").split(":")
+        if srv in up:
+            c = os.path.join(ENV("FAKE_COUNTER_DIR"), srv)
+            k = int(open(c).read()) + 1 if os.path.exists(c) else 1
+            open(c, "w").write(str(k))
+            if k > int(n):
+                body = "Error: 429 Too Many Requests (rate limit exceeded for the free tier)"
+    q = prompt.split("\n")[0][:80]
+
+    def fake_result(tool, q):
+        """Each provider's real result format, with two synthetic pages; FAKE_BIG pads the first page's text."""
+        pad, u1, u2 = "x" * int(ENV("FAKE_BIG", "0")), f"https://example.com/{h(tool) % 97}", "https://example.org/b"
+        if tool.startswith("mcp__parallel__"):
+            return json.dumps({"search_id": "search_fake123", "results": [
+                {"url": u1, "title": f"Result for {q}", "publish_date": "2026-01-02", "excerpts": [pad or "text"]},
+                {"url": u2, "title": "Second page", "publish_date": None, "excerpts": ["more"]}]})
+        if tool.startswith("mcp__exa__"):
+            return (f"Title: Result for {q}\nURL: {u1}\nPublished: 2026-01-02\nAuthor: N/A\nHighlights:\n{pad or 'text'}\n\n"
+                    f"Title: Second page\nURL: {u2}\nPublished: N/A\nAuthor: N/A\nHighlights:\nmore")
+        return (f'Web search results for query: "{q}"\n\nLinks: '
+                + json.dumps([{"title": f"Result for {q}", "url": u1}, {"title": "Second page", "url": u2}])
+                + f"\n\nA summary of the pages. {pad}")
+    lines = [
+        {"type": "system", "subtype": "init", "model": MODEL, "claude_code_version": "0.0.0-fake",
+         "tools": ["WebSearch", "WebFetch", "Read", *([tool] if up else [])],
+         "mcp_servers": [{"name": s, "status": st} for s, st in status.items()], "timestamp": "2026-11-20T10:00:00Z"},
+        {"type": "assistant", "timestamp": "2026-11-20T10:00:01.000Z",
+         "message": {"content": [{"type": "tool_use", "id": "t1", "name": tool, "input": {"query": q}}]}},
+        {"type": "user", "timestamp": "2026-11-20T10:00:02.500Z",
+         "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "is_error": bool(body),
+                                                  "content": body or fake_result(tool, q)}]}},
+        {"type": "result", "subtype": "success",
+         "result": f"Answer from {tool.split('__')[1] if '__' in tool else 'built-in'}: synthetic. Source: https://example.org/b",
+         "duration_ms": 1000 + h(tool) % 5000, "num_turns": 2, "total_cost_usd": 0.0},
+    ]
+    for ln in lines:
+        print(json.dumps(ln))
+    sys.exit(0)
+
+schema = json.loads(opt("--json-schema") or "{}")
+props = schema.get("properties", {})
+if ENV("FAKE_USAGE_LIMIT") in ("json", "all"):
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": True, "result": LIMIT_TEXT}))
+    sys.exit(1)
+if ENV("FAKE_FAIL") and ENV("FAKE_FAIL") in props:
+    print("Error: something went wrong", file=sys.stderr)
+    sys.exit(1)
+
+if "items" in props:  # task builder
+    out = {"items": []}
+    for m in re.finditer(r"^# Record (\d+)\n(.*?)(?=^# Record |\Z)", prompt, re.S | re.M):
+        i, body = int(m[1]), m[2]
+        drop = "DROPME" in body
+        out["items"].append({"record": i, "task": "" if drop else f"Synthetic task: {body.split('- ')[-1].strip()[:80]}",
+                             "drop": "premise expired" if drop else "", "basis": "context"})
+elif "instructions" in props:  # instruction rewrite
+    text = prompt.split("# The person's instructions\n\n", 1)[-1]
+    out = {"instructions": text, "changed": []}
+elif "ranks" in props:  # judge
+    labels = re.findall(r"^## Run (\w) evidence", prompt, re.M)
+    order = sorted(labels, key=lambda lab: h(prompt[:200] + lab))
+    out = {"required": {"direct_answer": ["the synthetic fact"], "other": ["a side point"]},
+           "answers": [{"label": f"Run {lab}", "recall_reason": f"Run {lab}'s evidence holds the synthetic fact.",
+                        "recall": 4 - order.index(lab), "error_reason": "Nothing departs.",
+                        "error": ["none", "none", "limited"][order.index(lab) % 3]} for lab in labels],
+           "ranking_reason": f"Run {order[0]} is most direct.",
+           "ranks": [{"label": f"Run {lab}", "rank": order.index(lab) + 1} for lab in labels],
+           "rationale": f"Run {order[0]}'s evidence has the vendor page [https://example.com/a]."}
+elif "pick" in props:  # verdict
+    providers = props["pick"]["enum"]
+    out = {"pick": providers[0], "runner_up": providers[1], "verdict": "Use the pick. It gave the most helpful answers."}
+elif "titles" in props:  # why
+    groups = re.findall(r"^# Group (\S+): ", prompt, re.M)
+    bullets = []
+    for g in groups:
+        sec = prompt.split(f"# Group {g}: ", 1)[1].split("\n# ", 1)[0]
+        ks = [int(k) for k in re.findall(r"^## Task (\d+):", sec, re.M)]
+        bullets.append({"group": g, "text": f"missed the synthetic fact ({ks[0]})", "tasks": ks})
+    titles = [{"task": int(k), "title": f"Synthetic subject {k}"} for k in re.findall(r"^- Task (\d+):", prompt, re.M)]
+    out = {"bullets": bullets, "titles": titles}
+elif "bullets" in props:  # check or rewrite
+    items = props["bullets"]["items"]["properties"]
+    res = []
+    for m in re.finditer(r"^# Bullet (\d+)\n(.*?)(?=^# Bullet |\Z)", prompt, re.S | re.M):
+        ks = [int(k) for k in re.findall(r"^## Task (\d+)", m[2], re.M)]
+        res.append({"bullet": int(m[1]), "holds": ks} if "holds" in items else
+                   {"bullet": int(m[1]), "text": m[2].split("\n")[0], "tasks": ks})
+    out = {"bullets": res}
+else:
+    print(json.dumps({"type": "result", "is_error": True, "result": f"fake claude: unknown schema {list(props)}"}))
+    sys.exit(1)
+
+print(json.dumps({"type": "result", "result": "", "structured_output": out, "total_cost_usd": 0.01,
+                  "modelUsage": {MODEL: {"outputTokens": 10}}}))

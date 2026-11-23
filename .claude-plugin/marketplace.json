@@ -1,0 +1,14 @@
+{
+  "name": "my-search-eval",
+  "description": "Evaluate web search providers on your own Claude Code research tasks.",
+  "owner": {
+    "name": "Vincent Ethier"
+  },
+  "plugins": [
+    {
+      "name": "my-search-eval",
+      "source": "./",
+      "description": "Which search provider makes Claude more useful for you, judged on your own past research."
+    }
+  ]
+}
