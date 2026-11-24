@@ -463,7 +463,13 @@ class Pipeline(FakeClaude):
             per[t["session"]] = per.get(t["session"], 0) + 1
         self.assertLessEqual(max(per.values()), 3)
         self.assertIn("Web", (run / "instructions" / "exa.md").read_text())  # the import was inlined
-        self.assertEqual(self.progress()["status"], "done")
+        p = self.progress()
+        self.assertEqual(p["status"], "done")
+        self.assertEqual(set(p["timings"]), set(orchestrate.PHASES))
+        self.assertNotIn("phase_start", p)
+        self.assertEqual(orchestrate.took({"build": 120, "replay": 500, "report": 10}),
+                         " in 10 min (build 2, replay 8, report <1)")
+        self.assertRegex(quiet(orchestrate.main, ["status", "--home", str(self.home)]), r"^Done in \S+ min \(instructions ")
         self.assertTrue((self.home / "cache").is_dir())  # the cache lives in the outputs home
         # replays allow Read, but only on Claude Code's saved tool outputs
         replay = next(c["args"] for c in self.calls() if "stream-json" in c["args"])
@@ -516,9 +522,13 @@ class Pipeline(FakeClaude):
         self.assertEqual(list(self.run_dir().glob("grades/*/*.json")), [])  # error text is never judged
         log = next((self.run_dir() / "runs").rglob("exa.jsonl"))
         self.assertFalse(runner.status(log, "exa")["finished"])
+        self.assertNotIn("phase_start", p)  # paused time isn't counted
+        replay = p["timings"]["replay"]
         os.environ.pop("FAKE_USAGE_LIMIT")
         self.resume()
-        self.assertEqual(self.progress()["status"], "done")
+        p = self.progress()
+        self.assertEqual(p["status"], "done")
+        self.assertGreaterEqual(p["timings"]["replay"], replay)  # summed across the resume
 
     def test_usage_limit_in_judge_pauses(self):
         self.start()

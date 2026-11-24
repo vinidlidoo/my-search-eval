@@ -136,7 +136,14 @@ class Progress:
 
     def set(self, **kw):
         with self.lock:
-            self.state.update({**kw, "updated": now()})
+            s = self.state
+            ending = kw.get("status") in ("done", "paused", "failed")
+            if (ending or "phase" in kw) and s.get("phase_start"):  # bank the phase's working time; pauses don't count
+                t = s.setdefault("timings", {})
+                t[s["phase"]] = round(t.get(s["phase"], 0) + time.time() - s.pop("phase_start"))
+            if kw.get("phase") in PHASES and not ending:
+                kw["phase_start"] = time.time()
+            s.update({**kw, "updated": now()})
             write_json(self.path, self.state)
 
     def phase(self, name, total=0, message=""):
@@ -149,12 +156,21 @@ class Progress:
         self.set(done=done, total=total)
 
 
+def took(timings):
+    """' in 14 min (build 2, replay 8, ...)': working time per phase, summed across resumes."""
+    if not timings:
+        return ""
+    m = lambda sec: f"{sec / 60:.0f}" if sec >= 30 else "<1"  # noqa: E731
+    parts = ", ".join(f"{k} {m(timings[k])}" for k in PHASES if k in timings)
+    return f" in {m(sum(timings.values()))} min ({parts})"
+
+
 def line(p):
     """One progress line from progress.json's state."""
     if not p:
         return "No progress yet."
     if p.get("status") == "done":
-        return f"Done. Report: {p.get('report')}"
+        return f"Done{took(p.get('timings'))}. Report: {p.get('report')}"
     if p.get("status") in ("failed", "paused"):
         return p.get("error") or "Stopped."
     n = f" {p['done']}/{p['total']}" if p.get("total") else ""
