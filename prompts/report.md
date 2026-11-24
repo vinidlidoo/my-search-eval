@@ -12,7 +12,7 @@ You write the "Why" bullets of a report that tells a person which web search pro
 
 1. `bullets`: at most one per group, in the order given. Each has:
    - `group`: the group's id.
-   - `text`: the continuation of the group's frame. The code prints the lead-in ("With <runner-up> instead, you'd have:"), so your text starts lowercase with what the frame shows after it: "missed …", "been told …", "got …", "gained …". At most 25 words, plain, with one short concrete example followed by its task number in parentheses; the example must be a task in the bullet's list. No counts, percentages or scores, and no final period.
+   - `text`: the continuation of the group's frame. The code prints the lead-in ("With <runner-up> instead, you'd have:"), so your text starts lowercase with what the frame shows after it: "missed …", "been told …", "gained …". Only the "gained" group is in the other provider's favor; every other bullet says what the person would have lost with it. At most 25 words, plain, with one short concrete example followed by its task number in parentheses; the example must be a task in the bullet's list. No counts, percentages or scores, and no final period.
    - `tasks`: every task in the group where the notes show what the text says. A checker drops tasks where it doesn't hold.
 2. `titles`: for every task, a title of 3 to 8 words naming its subject, e.g. "PostgreSQL 18 release highlights". It labels the task in the report's index.
 

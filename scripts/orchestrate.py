@@ -52,22 +52,16 @@ import report  # noqa: E402
 import runner  # noqa: E402
 from common import (PROVIDER_INFO, PROVIDERS, RETENTION_DAYS, AuthError, secure, UsageLimit, default_home, default_model, dev,  # noqa: E402
                     preflight_auth, read_jsonl, write_json, write_text)
-from cost import provider_calls  # noqa: E402
-from judge_runs import read_log  # noqa: E402
 
 FULL, QUICK, MIN_TASKS = 30, 10, 10
 WORKERS = 3
 KEEP_RUNS = 3
 KEEP_FILES = {"report.html", "report.md", "terminal.txt", "method.svg", "results.jsonl.gz", "diagnostics.md",
               "config.json", "progress.json"}  # what log pruning and --purge keep: the reports, and what dates the run
-CAP_WARN = 0.9  # warn when a run's expected keyless calls reach this share of a provider's daily cap
 RATE_STOP = 2  # refusals from one provider's rate limit, across the run, that stop replaying
 PHASES = ["instructions", "build", "replay", "judge", "report"]
-# From test runs on Opus: minutes per call (for the plan only), API-equivalent $ per task (3 replays plus the
-# judge), and provider MCP calls per task (the spike averaged 4.9).
+# From test runs on Opus: minutes per call, for the plan's time estimate.
 MIN_RUN, MIN_JUDGE, MIN_BUILD, MIN_REPORT = 1.5, 1.0, 1.5, 3.0
-USD_PER_TASK = 1.3
-CALLS_PER_TASK = 5
 RUN = "/my-search-eval:run"
 RESUME = "/my-search-eval:run --resume"
 TRANSCRIPTS_HINT = ("Claude Code deletes transcripts after 30 days by default; raise \"cleanupPeriodDays\" in "
@@ -178,54 +172,10 @@ def line(p):
     return f"[{p.get('step')}/{p.get('steps')}] {p.get('phase')}{n}{msg}"
 
 
-# ---------- per-day provider call ledger ----------
-
-LEDGER_LOCK = threading.Lock()
-
-
-def ledger_add(home, provider, n):
-    if not n:
-        return
-    with LEDGER_LOCK:
-        f = Path(home) / "ledger.json"
-        try:
-            data = json.loads(f.read_text())
-        except (OSError, ValueError):
-            data = {}
-        day = data.setdefault(date.today().isoformat(), {})
-        day[provider] = day.get(provider, 0) + n
-        write_json(f, recent(data))
-
-
-LEDGER_DAYS = 3  # the ledger only answers "how many calls today"; a few days covers time zones and resumes
-
-
-def recent(data):
-    first = (date.today() - timedelta(days=LEDGER_DAYS - 1)).isoformat()
-    return {k: v for k, v in data.items() if k >= first}
-
-
-def ledger_prune(home):
-    f = Path(home) / "ledger.json"
-    with LEDGER_LOCK:
-        try:
-            data = json.loads(f.read_text())
-        except (OSError, ValueError):
-            return
-        if isinstance(data, dict) and recent(data) != data:
-            write_json(f, recent(data))
-
-
-def ledger_today(home, provider):
-    try:
-        return json.loads((Path(home) / "ledger.json").read_text()).get(date.today().isoformat(), {}).get(provider, 0)
-    except (OSError, ValueError):
-        return 0
-
 
 # ---------- plan ----------
 
-def plan(want, pool, has_instr, home, sub, quick):
+def plan(want, pool, has_instr, sub, quick):
     n = min(want, pool)
     batches = -(-int(n * build.OVERSAMPLE + 0.999) // build.BATCH)
     runs, judges = n * len(PROVIDERS), n
@@ -238,19 +188,10 @@ def plan(want, pool, has_instr, home, sub, quick):
     out = [f"Plan: up to {n} tasks{fewer} x {len(PROVIDERS)} providers: {names}. The task builder may drop a few.",
            f"About {calls} model runs: {runs} replays, {judges} judge calls, ~{batches} task-builder calls, "
            f"{str(len(PROVIDERS)) + ' instruction rewrites, ' if has_instr else ''}~4 report calls.",
-           f"Usage: about ${n * USD_PER_TASK:.0f} at API list prices on Opus. It counts against your plan's limits; "
-           "it is not billed.",
+           "Usage: runs on your Claude plan, with no API charges.",
            f"Estimated wall time: about {when}, {WORKERS} runs at a time."]
     if sub == "pro" and not quick:
         out.append("On Pro, a full run can use a large share of your weekly limit: consider `--quick` first.")
-    for e, v in PROVIDER_INFO.items():
-        cap = (v.get("free") or {}).get("keyless_per_day")
-        need, used = n * CALLS_PER_TASK, ledger_today(home, e)
-        if cap and need + used >= CAP_WARN * cap:
-            out.append(f"Warning: {v['name']}'s free keyless tier may allow about {cap} calls a day (unconfirmed); "
-                       f"this run needs about {need}" + (f", and earlier runs used {used} today" if used else "")
-                       + f", close to or over that. If {v['name']} hits its limit, the run stops and the report "
-                       "covers fewer tasks: those finished so far.")
     return "\n".join(out)
 
 
@@ -308,8 +249,6 @@ def replay(run_dir, home, tasks, model, instr, prog):
             except Exception as exc:
                 print(f"run failed: task {t['n']} {e}: {exc}", file=sys.stderr, flush=True)
             st = runner.status(log, e)
-            if PROVIDER_INFO[e]["mcp"]:
-                ledger_add(home, e, provider_calls(read_log(log)))
             if st["usage_limit"]:
                 return halt(("usage", st["error"]))
             if st["rate_limited"]:  # one refusal reruns the task; RATE_STOP across the run stops replaying
@@ -404,7 +343,7 @@ def remove(p):
 
 def prune(home, keep_logs, current, cache_dir=None):
     """Retention, run at the start of each run. Deletes run folders older than RETENTION_DAYS, raw logs of all but
-    the newest KEEP_RUNS runs (unless keep_logs), cache entries unused for RETENTION_DAYS, and old ledger days.
+    the newest KEEP_RUNS runs (unless keep_logs), and cache entries unused for RETENTION_DAYS.
     Runs are ordered by start time (run_time), not name. Never touches the current run, the most recent other run, the
     run `latest` points to (so the one paused run that can be resumed), a running run while a worker holds the lock,
     or anything through a symlink. A run folder is one named by its start time, or one with a config.json.
@@ -444,7 +383,7 @@ def prune(home, keep_logs, current, cache_dir=None):
             if f.is_file() and not f.is_symlink() and datetime.fromtimestamp(st.st_mtime) < cutoff:
                 f.unlink()
                 out["cache"] += 1
-    ledger_prune(home)
+    (Path(home) / "ledger.json").unlink(missing_ok=True)  # left by v0.4.2 and earlier
     return out
 
 
@@ -629,7 +568,7 @@ def start(a):
         print(f"Login: Claude subscription ({sub}); API keys and cloud providers are off for every run.")
         print(f"Model: {cfg['model'] or 'your default model'}.")
         has_instr = cfg["instructions"] and bool(instructions.user_instructions().strip())
-        print(plan(want, pool, has_instr, home, sub, a.quick))
+        print(plan(want, pool, has_instr, sub, a.quick))
     latest = root / "latest"
     if latest.is_symlink() or latest.exists():
         latest.unlink()

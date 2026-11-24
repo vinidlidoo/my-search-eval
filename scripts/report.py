@@ -527,8 +527,8 @@ def groups(T, agg, w, r):
                    f"With {R} instead, you'd have: missed … (material {W}'s evidence held and {R}'s didn't)", (w, r)),
         "wrong": None,
         "other": (f"the {len(sp['call'])} tasks where {W} was ranked above {R} on the judge's call", sp["call"],
-                  f"With {R} instead, you'd have: got … (something concrete the judge preferred in {W}'s answer, "
-                  "neither material nor errors)",
+                  f"With {R} instead, you'd have: missed … (something concrete the judge preferred in {W}'s answer and "
+                  f"{R}'s lacked, neither material nor errors)",
                   (w, r)),
         "gave": (f"the {len(above(r, w))} tasks where {R} was ranked above {W}", above(r, w),
                  f"With {R} instead, though, you'd have: gained … (what {R} gave that {W} didn't)", (w, r)),

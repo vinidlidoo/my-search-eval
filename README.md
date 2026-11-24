@@ -70,12 +70,12 @@ Tested on macOS only; Linux and WSL should work but are untested. Not native Win
 
 ## Time and usage
 
-| | Tasks | Model runs | Wall time | Usage at API list prices, on Opus |
-|---|--:|--:|--:|--:|
-| `--quick` | 10 | about 50 | about 25 minutes | about $13 |
-| default | 30 | about 135 | about 1 hour | about $39 |
+| | Tasks | Model runs | Wall time |
+|---|--:|--:|--:|
+| `--quick` | 10 | about 50 | about 25 minutes |
+| default | 30 | about 135 | about 1 hour |
 
-Usage counts against your plan's limits; it is not billed. The plan, with these numbers for your run, prints as the run starts.
+Usage counts against your plan's limits, with no API charges. The plan, with these numbers for your run, prints as the run starts.
 
 - **Max:** a full run fits easily.
 - **Pro:** start with `--quick`, or use `--model sonnet` for less usage. A full Opus run can use a large share of your weekly limit.
@@ -143,7 +143,7 @@ The providers:
 - **Small samples.** Up to 10 or 30 tasks (fewer if some are lost during the run), one run per provider per task, no error bars: a few tasks can swing a close call.
 - **The judge is Claude,** because Claude is the one reading search results. No human grading.
 - **The runs are recognizable by format.** Each provider's results look different (Parallel's JSON, Exa's text blocks, built-in search's summaries), so the judge can tell the runs apart, though it isn't told which provider is which.
-- **Keyless tiers are rate-limited.** Exa's keyless tier may allow about 150 calls a day, and a full run needs about that many, so the plan warns when a run, with earlier runs today, would come close. If a provider hits its keyless rate limit, the run stops and reports the tasks finished, instead of waiting for the limit to reset; the report says so. A Claude usage limit is different: the run pauses, and `--resume` continues it. The eval runs keyless only; for your everyday use, a free API key lifts the limits.
+- **Keyless tiers are rate-limited.** A full run makes about 100 calls to each provider. If a provider hits its keyless rate limit, the run stops and reports the tasks finished, instead of waiting for the limit to reset; the report says so. A Claude usage limit is different: the run pauses, and `--resume` continues it. The eval runs keyless only; for your everyday use, a free API key lifts the limits.
 - **Unpriced tools.** Cost covers each provider's priced search and fetch tools. Calls to other tools (for example Parallel's vertical search) aren't priced; the report says how many there were.
 - **Fetched pages are untrusted.** A page could try to steer a replay. Replays have no shell and can read only their own saved results, so it can't reach your files.
 - **Claude Code transcripts only.** Claude Code deletes transcripts after 30 days by default; raise `cleanupPeriodDays` in `~/.claude/settings.json` to keep more.

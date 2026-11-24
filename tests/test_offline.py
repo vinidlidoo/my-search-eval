@@ -451,7 +451,8 @@ class Pipeline(FakeClaude):
         (cfg / "shared.md").write_text("## Web\n\nSearch with Exa `web_search_exa`.\n")
         (cfg / "CLAUDE.md").write_text("# Mine\n\n@shared.md\n")
         out = self.start()
-        self.assertIn("Usage: about $13 at API list prices", out)
+        self.assertIn("Usage: runs on your Claude plan, with no API charges.", out)
+        self.assertNotIn("$", out.split("Plan:", 1)[1].split("\n\n", 1)[0])
         run = self.run_dir()
         for f in ["report.md", "report.html", "terminal.txt", "tasks.jsonl", "harvest.jsonl", "tasks.frozen"]:
             self.assertTrue((run / f).exists(), f)
@@ -572,8 +573,6 @@ class Pipeline(FakeClaude):
         self.assertIn(note, limits)
         self.assertIn("Exa hit its rate limit", term)  # the task that hit it is left out
         self.assertEqual(len(report.load(run / "tasks.jsonl", run / "grades", str(run / "runs"))[0]), k)
-        ledger = json.loads((self.home / "ledger.json").read_text())
-        self.assertGreaterEqual(next(iter(ledger.values()))["exa"], 5)
         # task by task: the first replays are all three providers on task 1, then task 2
         replays = [c["prompt"] for c in self.calls() if "stream-json" in c["args"]]
         self.assertEqual(len(set(replays[:3])), 1)
@@ -589,13 +588,11 @@ class Pipeline(FakeClaude):
         self.assertIn("or use --quick", p["error"])
         self.assertNotIn("API key", p["error"])
 
-    def test_plan_warns_about_a_keyless_cap(self):
-        self.home.mkdir(parents=True)
-        orchestrate.ledger_add(self.home, "exa", 140)
-        text = orchestrate.plan(10, 50, False, self.home, "max", True)
-        self.assertIn("Exa's free keyless tier may allow about 150 calls a day", text)
-        self.assertIn("earlier runs used 140 today", text)
-        self.assertIn("consider `--quick`", orchestrate.plan(30, 50, False, self.home, "pro", False))
+    def test_plan_has_no_dollars_or_cap_warning(self):
+        full = orchestrate.plan(30, 100, False, "max", False)
+        self.assertNotIn("$", full)
+        self.assertNotIn("Warning", full)
+        self.assertIn("consider `--quick`", orchestrate.plan(30, 50, False, "pro", False))
 
     def test_judge_evidence_fits_the_context(self):
         self.assertEqual(grade.shares({"a": 10, "b": 500, "c": 300}, 400), {"a": 10, "c": 195, "b": 195})
@@ -782,9 +779,7 @@ class Pipeline(FakeClaude):
             (cache / name).write_text("{}")
             t = __import__("time").time() - age * 86400
             os.utime(cache / name, (t, t))
-        from datetime import date, timedelta
-        days = {(date.today() - timedelta(days=k)).isoformat(): {"exa": k} for k in range(10)}
-        (self.home / "ledger.json").write_text(json.dumps(days))
+        (self.home / "ledger.json").write_text("{}")  # left by older versions
 
         held = orchestrate.acquire(self.home)  # a worker is active: its "running" run is never touched
         try:
@@ -806,7 +801,7 @@ class Pipeline(FakeClaude):
             self.assertTrue((r[k] / "harvest.jsonl").exists())
         self.assertTrue((outside / "runs").exists() and (self.home / "runs" / "linked").is_symlink())
         self.assertEqual(sorted(p.name for p in cache.iterdir()), ["fresh.json"])
-        self.assertEqual(len(json.loads((self.home / "ledger.json").read_text())), orchestrate.LEDGER_DAYS)
+        self.assertFalse((self.home / "ledger.json").exists())
         line = orchestrate.prune_line(out)
         self.assertIn(f"older than {common.RETENTION_DAYS} days", line)
         self.assertIn("deleted 1 cache entry", line)
@@ -1013,13 +1008,6 @@ class Robustness(FakeClaude):
                          "an MCP server failed to connect")
         self.assertIsNone(diagnostics.known("authentication of the author failed"))
         self.assertEqual(diagnostics.failure(common.AuthError("anything"))["exc_label"], "login check refused")
-
-    def test_plan_warns_near_the_keyless_cap(self):
-        self.home.mkdir(parents=True)
-        full = orchestrate.plan(30, 100, False, self.home, "max", False)
-        self.assertIn("Warning: Exa's free keyless tier may allow about 150 calls a day", full)  # 150 of 150
-        self.assertIn("the report covers fewer tasks", full)
-        self.assertNotIn("Warning", orchestrate.plan(10, 100, False, self.home, "max", True))  # 50 of 150
 
     def test_lock_waits_for_a_brief_probe(self):
         import threading
