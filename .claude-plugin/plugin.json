@@ -1,6 +1,6 @@
 {
   "name": "my-search-eval",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Which search provider makes Claude more useful for you, judged on your own past research: replays research tasks from your Claude Code transcripts on Exa, Parallel and built-in search, then judges and recommends one.",
   "author": {
     "name": "Vincent Ethier"

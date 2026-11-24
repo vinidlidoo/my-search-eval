@@ -1,7 +1,7 @@
 ---
 name: run
 description: Recommend a web search provider for Claude (Exa, Parallel or built-in search) by replaying research from your own Claude Code transcripts and judging the answers. Takes about 25 minutes to an hour in the background.
-argument-hint: "[--quick] [--model M] [--keep-logs] [--no-instructions] [--resume] [--purge] [--diagnose]"
+argument-hint: "[--quick]"
 disable-model-invocation: true
 allowed-tools: Bash(command -v python3) Bash(python3 -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrate.py" start*) Bash(python3 -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrate.py" status*) Bash(python3 -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrate.py" diagnose) Bash(python3 -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrate.py" issue-url*)
 ---
