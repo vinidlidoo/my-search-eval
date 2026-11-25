@@ -515,6 +515,26 @@ def computed(T, order, n, link=str):
     return lines
 
 
+BUCKETS_NOTE = "Each task where one answer was ranked above another, put in one bucket by the judge's own grades:"
+BUCKETS = [("More recall", "The higher-ranked run's evidence held more."),
+           ("Fewer errors", "Equal recall, and the lower-ranked answer had the worse error."),
+           ("Judge's call", "Everything else.")]
+
+
+def computed_table(T, order, link=str):
+    """computed() as a Markdown table: one row per pair and direction."""
+    rows = []
+    for a, b in combinations(order, 2):
+        for x, y in ((a, b), (b, a)):
+            sp = split(T, x, y)
+            total = sum(map(len, sp.values()))
+            if total:
+                err = f"{len(sp['errors'])} ({', '.join(map(link, sp['errors']))})" if sp["errors"] else "0"
+                rows.append(f"| {NAME[x][0].upper() + NAME[x][1:]} above {NAME[y]} | {total} | {len(sp['recall'])} | {err} "
+                            f"| {len(sp['call'])} |")
+    return ["| Ranked above | Tasks | More recall | Fewer errors | Judge's call |", "|---|--:|--:|--:|--:|", *rows]
+
+
 # Why: one bullet per Providers-table column, framed as what you'd have experienced with another provider.
 # tag, then the frame against the other provider o and in o's favor ({W}: the pick, {O}: o).
 CATS = {
@@ -676,9 +696,20 @@ def md_refs(text, b):
 
 
 def why_coverage(why):
-    """Methodology lines: each Why statement and how many of its group's tasks it holds on."""
+    """Diagnostics table: each Why statement and how many of its group's tasks it holds on."""
     short = lambda t: re.sub(r"\s*\(task \d+\)", "", re.split(r",? (?:such as|like|e\.g\.) ", t)[0])  # noqa: E731
-    return [f"- \"{short(task_ref(b['text']))}\": {len(b['tasks'])} of {b['group']}." for _, _, b, _ in why_layout(why) if b]
+    rows = []
+    for _, _, b, _ in why_layout(why):
+        if b:
+            m = re.match(r"the (\d+) tasks? where (.+)", b["group"])
+            where, held = (m[2], f"{len(b['tasks'])} of {m[1]}") if m else (b["group"], str(len(b["tasks"])))
+            rows.append(f"| \"{md_cell(short(task_ref(b['text'])))}\" | {md_cell(cap1(where))} | {held} |")
+    return ["| Statement | Tasks where | Holds on |", "|---|---|--:|", *rows] if rows else []
+
+
+def md_cell(text):
+    """Text safe inside a Markdown table cell."""
+    return " ".join(text.split()).replace("|", "\\|")
 
 
 def task_ref(text):
@@ -798,8 +829,7 @@ def summary(T, dates, agg, pairs, order, why, verdict, pick, sample="", check=No
         for kind, text, b, _ in why_layout(why):
             md += ((([""] if md[-1] else []) + [text, ""]) if kind == "head" else [f"- **{b['tag']}** · {md_refs(text, b)}"])
     md += ["", "## How the grades explain the ranking", "",
-           "Each task where one answer was ranked above another, put in one bucket by the judge's own grades: more "
-           "recall, fewer errors at equal recall, or the judge's call.", "",
+           BUCKETS_NOTE, "", *(f"- **{t}:** {d}" for t, d in BUCKETS), "", "Per pair:", "",
            *(f"- {line}" for line in computed(T, order, n, link))]
     # the bars beside fractions show the value as displayed
     bar = {"ranked best": lambda e: (agg[e]["best"], n), "recall": lambda e: (round(agg[e]["recall"], 1), 4)}
@@ -876,129 +906,185 @@ def providers_text():
     return (" and ".join(mcps) if len(mcps) < 3 else ", ".join(mcps[:-1]) + " and " + mcps[-1]), LONG[BASELINE]
 
 
-def methodology_md(n, judge_model, judges, has_cost=True, coverage=(), no_instructions=None):
+def cap1(text):
+    """First letter upper-cased, for a value that opens a sentence ("http …" -> "HTTP …")."""
+    text = re.sub(r"^http ", "HTTP ", text)
+    return text[:1].upper() + text[1:]
+
+
+def methodology_md(n, judge_model, no_instructions=None):
     """Method, independent of which providers ran: names come from the configuration. no_instructions: why the runs
     had no instructions, or None if they had them."""
     from build import PER_SESSION
     from runner import TIMEOUT
-    mcps, base = providers_text()
-    cost = (f"- Cost: each provider's list API price for the run's calls to its priced search and fetch tools, per "
-            f"task; {base} is $0. Calls that returned an error aren't counted, nor calls to tools with no known price "
-            "(for example a provider's vertical search); the report says how many of those there were. Monthly cost "
-            "multiplies the price by your research tasks "
-            "per month (tasks found in your transcripts over the months they span), then subtracts the provider's free "
-            "monthly credit.\n") if has_cost else ""
+    mcps, _ = providers_text()
+    base = NAME[BASELINE]
     mine = (" and your instructions (your user CLAUDE.md, with its web-tool lines routed to each provider)"
             if not no_instructions else f" ({no_instructions})")
     return f"""## Methodology
 
 ![How the eval works: transcripts, sampled tasks, one run per provider, judge, verdict and report](method.svg)
 
-**Setup.** Each provider runs keyless, configured as its docs install it in Claude Code (checked {SETUP_CHECKED}): its keyless HTTP MCP server, with no API key. The Configuration section shows the exact setup.
+Each provider runs keyless, configured as its docs install it in Claude Code (checked {SETUP_CHECKED}): its keyless HTTP MCP server, with no API key. The Configuration section shows the exact setup.
 
-**What ran**
+### What ran
 
-1. Tasks: {n} research questions recovered from your Claude Code transcripts. A research task is one request or one subagent where Claude searched the web with built-in WebSearch or Exa, Parallel, Firecrawl or webclaw search; other search tools aren't recognized. Tasks were drawn at random, at most {PER_SESSION} per session, and each was rewritten to stand alone (follow-ups folded in); the task builder drops tasks whose premise has expired or that have no fair public question, and a code check drops any that still hold an email address, a local path, your username or a project folder's name. The run needs at least {MIN_TASKS} tasks before it starts; tasks lost later are left out, and the summary says which and why.
-2. Runs: each task replayed once per provider, with the same model{mine}. Replays are fresh headless sessions: no project CLAUDE.md, skills, plugins, hooks or other MCP servers; web search and fetch only, plus reading back their own saved results; {TIMEOUT // 60} minutes at most. Each provider under test ({mcps}) ran as an MCP server alongside {base}; the baseline had {base} only. A replay whose MCP server didn't connect, that didn't finish, or that a provider's rate limit refused is rerun once; if it fails again, the task is left out for every provider. Once a provider's keyless rate limit has refused {RATE_STOP} replays in the run, replaying stops and the report covers the tasks finished on every provider, instead of waiting for the limit to reset.
-3. Judging: one judge call per task, by {judge_model}, the same model that ran the tasks. The judge reads the task, each run's evidence (everything its searches and fetches returned, up to the caps in Limits) and each run's answer, in a shuffled order under labels A, B and C. Provider and tool names, and request ids, are removed from the evidence and the answers. A task whose judge call fails twice is left out.
+1. **Tasks.** {n} research questions recovered from your Claude Code transcripts.
+   - A research task is one request or one subagent where Claude searched the web with built-in WebSearch or Exa, Parallel, Firecrawl or webclaw search; other search tools aren't recognized.
+   - Tasks were drawn at random, at most {PER_SESSION} per session, and each was rewritten to stand alone (follow-ups folded in).
+   - The task builder drops tasks whose premise has expired or that have no fair public question, and a code check drops any that still hold an email address, a local path, your username or a project folder's name.
+   - The run needs at least {MIN_TASKS} tasks before it starts; tasks lost later are left out, and the summary says which and why.
+2. **Runs.** Each task replayed once per provider, with the same model{mine}.
+   - Replays are fresh headless sessions: no project CLAUDE.md, skills, plugins, hooks or other MCP servers; web search and fetch only, plus reading back their own saved results; {TIMEOUT // 60} minutes at most.
+   - Each provider under test ({mcps}) ran as an MCP server alongside {base}; the baseline had {base} only.
+   - A replay whose MCP server didn't connect, that didn't finish, or that a provider's rate limit refused is rerun once; if it fails again, the task is left out for every provider.
+   - Once a provider's keyless rate limit has refused {RATE_STOP} replays in the run, replaying stops and the report covers the tasks finished on every provider, instead of waiting for the limit to reset.
+3. **Judging.** One judge call per task, by {judge_model}, the same model that ran the tasks.
+   - The judge reads the task, each run's evidence (everything its searches and fetches returned, up to the caps in Limits) and each run's answer, in a shuffled order under labels A, B and C.
+   - Provider and tool names, and request ids, are removed from the evidence and the answers.
+   - A task whose judge call fails twice is left out.
 
-**What the judge does, in one call per task**
+### What the judge does, in one call per task
 
-1. Lists what a complete answer requires, from all runs' evidence together, before grading the answers: the direct answer to each question, then the points a person asking would expect.
-2. Recall (0 to 4): how much of that list each run's evidence contains. Evidence missing the direct answer can't score above 2.
-3. Errors: whether each answer departs from what all the evidence shows, on the main point (main error), only on a side point (side error), or not at all. Saying "I couldn't find it" is never an error.
-4. Ranking: orders the answers from most to least helpful to the person, in light of the evidence, using each rank once and giving its reasons first.
+- **Requirements.** Lists what a complete answer requires, from all runs' evidence together, before grading the answers: the direct answer to each question, then the points a person asking would expect.
+- **Recall (0 to 4).** How much of that list each run's evidence contains. Evidence missing the direct answer can't score above 2.
+- **Errors.** Whether each answer departs from what all the evidence shows, on the main point (main error), only on a side point (side error), or not at all. Saying "I couldn't find it" is never an error.
+- **Ranking.** Orders the answers from most to least helpful to the person, in light of the evidence, using each rank once and giving its reasons first.
 
-The ranking decides every per-task outcome in this report. Recall and errors are reported because they explain the ranking; they don't decide it.
+> The ranking decides every per-task outcome in this report. Recall and errors are reported because they explain the ranking; they don't decide it.
+""".splitlines()
 
-**How providers are compared**
 
-- Ranked best: tasks where a provider's answer was ranked first.
-- Head to head: tasks where one provider's answer was ranked above another's.
-- Verdict: one LLM call reads every number in this report's summary (ranked best, recall, errors, ranked above and how the grades explain it, list fee and monthly cost after free tiers, keyless limits, context tokens, time) and each task with the judge's grades and notes. It picks the provider it judges would make Claude most useful to you, {base} included, weighing the metrics itself with no fixed thresholds, and names the runner-up. Code checks that every number the verdict cites is among the summary numbers in its input (allowing rounding to a whole number) and that the runner-up differs from the pick; otherwise it retries once. If it still fails, or the call fails, the report names the provider ranked best most often instead.
-- Why: for each other provider, code picks fixed sets of tasks by the Providers table's columns: where the recommended provider had more recall, where only the other provider's answer had an error on the main point, or only on a side point, and where the judge ranked the recommended provider above on its own call. Every column where the recommended provider leads gets a set, plus the one column with the most tasks in the other provider's favor; after the check, the report keeps the point in the other provider's favor and the largest leads, {WHY_CAP} bullets at most, each tagged with its column. An LLM names what made the difference in each set, from the judge's notes, with an example. A check call keeps only the tasks where each statement holds; a failing bullet is rewritten once and rechecked, or dropped. A set needs at least {MIN_GROUP} tasks, and a statement is kept only if the check confirms it on at least {MIN_GROUP}; an error on the main point needs one. With none, the report has no Why section and says why.
-- How the grades explain the ranking: each task where one answer was ranked above another is put in one bucket by the judge's own grades. More recall: the higher-ranked run's evidence held more. Fewer errors: equal recall, and the lower-ranked answer had the worse error. Judge's call: everything else.
-{cost}- Context tokens: the size of the search and fetch results a run put into Claude's context, estimated at 4 characters per token. Time: the headless session's wall time, from task to final answer.
-""" + ("\n**How far each Why statement holds** (tasks where the check kept it, of the set it was written for)\n\n"
-       + "\n".join(coverage) + "\n" if coverage else "")
+def metrics_md(has_cost=True):
+    """How each number in the summary is computed; the buckets are defined with the ranking breakdown."""
+    base = NAME[BASELINE]
+    cost = ["- **Cost:** Each provider's list API price for the run's calls to its priced search and fetch tools, per "
+            f"task; {base} is $0.",
+            "  - Calls that returned an error aren't counted, nor calls to tools with no known price (for example a "
+            "provider's vertical search); the report says how many of those there were.",
+            "  - Monthly cost multiplies the price by your research tasks per month (tasks found in your transcripts over "
+            "the months they span), then subtracts the provider's free monthly credit."] if has_cost else []
+    return ["## Metrics", "",
+            "- **Ranked best:** Tasks where a provider's answer was ranked first.",
+            "- **Head to head:** Tasks where one provider's answer was ranked above another's.",
+            f"- **Verdict:** One LLM call picks the provider it judges would make Claude most useful to you, {base} "
+            "included, and names the runner-up.",
+            "  - It reads every number in this report's summary (ranked best, recall, errors, ranked above and how the "
+            "grades explain it, list fee and monthly cost after free tiers, keyless limits, context tokens, time) and "
+            "each task with the judge's grades and notes.",
+            "  - It weighs the metrics itself, with no fixed thresholds.",
+            "  - Code checks that every number the verdict cites is among the summary numbers in its input (allowing "
+            "rounding to a whole number) and that the runner-up differs from the pick; otherwise it retries once.",
+            "  - If it still fails, or the call fails, the report names the provider ranked best most often instead.",
+            "- **Why:** For each other provider, code picks fixed sets of tasks by the Providers table's columns: where the "
+            "recommended provider had more recall, where only the other provider's answer had an error on the main "
+            "point, or only on a side point, and where the judge ranked the recommended provider above on its own call.",
+            "  - Every column where the recommended provider leads gets a set, plus the one column with the most tasks "
+            "in the other provider's favor.",
+            "  - An LLM names what made the difference in each set, from the judge's notes, with an example.",
+            "  - A check call keeps only the tasks where each statement holds; a failing bullet is rewritten once and "
+            "rechecked, or dropped.",
+            f"  - A set needs at least {MIN_GROUP} tasks, and a statement is kept only if the check confirms it on at "
+            f"least {MIN_GROUP}; an error on the main point needs one.",
+            "  - After the check, the report keeps the point in the other provider's favor and the largest leads, "
+            f"{WHY_CAP} bullets at most, each tagged with its column. With none, the report has no Why section and says "
+            "why.",
+            *cost,
+            "- **Context tokens:** The size of the search and fetch results a run put into Claude's context, estimated "
+            "at 4 characters per token.",
+            "- **Time:** The headless session's wall time, from task to final answer.", ""]
 
 
 def config_md(T, run_cfg, judge_model, writer_model, dates, hs, sample_note, rr):
     cfg, models, versions = run_cfg
     when = dates[0] if len(dates) == 1 else f"{dates[0]} to {dates[-1]}" if dates else "unknown"
-    out = ["## Configuration", ""]
+    out = ["## Configuration", "", "### Providers", ""]
     for e in PROVIDERS:
-        tools = ", ".join(f"`{x}`" for x in cfg[e]["tools"]) or "none"
-        out.append(f"- {LONG[e]}: {cfg[e]['connection']}. Web tools offered: {tools}.")
-    out += [f"- Tasks ran on: {counted(models)}, Claude Code {counted(versions)}.",
-            f"- Judge: {judge_model}. Verdict and Why: {writer_model}.",
-            f"- Run dates: {when}."
+        tools = cfg[e]["tools"]
+        n = f"{len(tools)} web tool{'' if len(tools) == 1 else 's'}" if tools else "no web tools"
+        out.append(f"- **{cap1(LONG[e])}:** {cap1(cfg[e]['connection'])}; {n}.")
+        if tools:
+            out.append("  - " + ", ".join(f"`{x}`" for x in tools) + ".")
+    roles = {}
+    for role, m in (("tasks", counted(models)), ("judging", judge_model), ("the Verdict and Why calls", writer_model)):
+        roles.setdefault(m, []).append(role)
+    use = "; ".join(f"{m} for {' and '.join(r) if len(r) < 3 else ', '.join(r[:-1]) + ' and ' + r[-1]}"
+                    for m, r in roles.items())
+    out += ["", "### Run", "",
+            f"- **Models:** {use}; Claude Code {counted(versions)}.",
+            f"- **Run dates:** {when}."
             + (f" {len(rr)} {'run was' if len(rr) == 1 else 'runs were'} rerun after the provider's MCP server failed to connect: "
                + ", ".join(f"task {k} ({NAME.get(e, e)})" for k, e in rr) + "." if rr else ""),
-            f"- Tasks: {len(T)}" + (f", from {hs['tasks']:,} research tasks found in your transcripts "
-                                     f"({span(hs['first'], hs['last'])})" if hs else "") + ".",
-            f"- Sample: {sample_note}"
-            + (f". Your transcripts held {hs['tasks']:,} research tasks ({hs['searches']:,} searches)." if hs else "."),
-            *([f"- Prices: the plugin's price table{f' (checked {CHECKED})' if CHECKED else ''}, list prices with sources."]
+            f"- **Tasks:** {len(T)}" + (f", from {hs['tasks']:,} research tasks ({hs['searches']:,} searches) found in your "
+                                         f"transcripts ({span(hs['first'], hs['last'])})" if hs else "") + ".",
+            f"- **Sample:** {cap1(sample_note)}.",
+            *([f"- **Prices:** The plugin's price table{f' (checked {CHECKED})' if CHECKED else ''}, list prices with sources."]
               if cost_usd else []), ""]
     return out
 
 
 def capped_limit(T, model=None):
+    """The evidence-caps limit: the caps and the tasks they cut, then the details as sub-items."""
     capped = [(k, e) for k, t in T.items() for e in PROVIDERS if t["e"][e]["capped"]]
     budget = evidence_budget(model)
-    text = (f"- The judge reads at most {MAX_RESULT // 1000}k characters of each search or fetch result"
+    text = (f"- **Evidence caps.** The judge reads at most {MAX_RESULT // 1000}k characters of each search or fetch result"
             + (f" and {MAX_EVIDENCE // 1000}k per run" if MAX_EVIDENCE < budget else "")
-            + f", and all runs' evidence for a task must fit about {budget // 1000}k characters (its context window, "
-            "with room for the rest; less for text in scripts like Chinese or Japanese, which use more tokens per "
-            "character). Each run gets an even share, and what a smaller run doesn't use goes to the others. A run "
-            "over its share is judged on its earliest results.")
+            + f", and all runs' evidence for a task must fit about {budget // 1000}k characters.")
     if capped:
         by = {}
         for k, e in capped:
             by.setdefault(k, []).append(NAME[e])
         text += " Cut here: " + "; ".join(f"task {k} ({' and '.join(v)})" for k, v in by.items()) + "."
-    return text
+    return [text,
+            "  - That budget is the judge's context window, with room for the rest; it is less for text in scripts like "
+            "Chinese or Japanese, which use more tokens per character.",
+            "  - Each run gets an even share, and what a smaller run doesn't use goes to the others.",
+            "  - A run over its share is judged on its earliest results."]
 
 
 def limits_md(T, judge_model, keyless, model=None, stop_note=None):
     n = len(T)
-    mcps, base = providers_text()
-    forced = "- Near-equal answers are still forced into an order, so some \"above\" results are coin flips."
-    return ["## Limits", "",
-            f"- One Claude model judges, by design: {judge_model}, the same model that ran the tasks. Claude is the "
-            "provider's real customer: it reads the results and writes the answer, so it ranks the answers in light of "
-            "the evidence. Recall and errors explain its ranking but don't decide it.",
-            forced,
-            f"- No error bars, and the verdict is a judgment, not a significance test: with {n} tasks, a few tasks can "
-            "swing a close call.",
-            "- Recall is relative: \"complete\" means what the providers found together.",
-            capped_limit(T, model),
-            *([f"- {stop_note}"] if stop_note else []),
-            "- One run per provider per task. The same task run again can search differently and land on a better or worse "
-            "answer, so a single task's result partly reflects luck. Across many tasks this mostly evens out.",
-            f"- A provider's results mean that provider plus {base}: the MCP runs kept {base} available.",
-            "- Each provider's results have their own format (JSON, text blocks, or summaries written by "
-            f"{base}'s search tool), so the judge can tell the runs apart by format, though it isn't told which "
-            "provider is which.",
-            *([f"- {' and '.join(LONG[e] for e in keyless)} ran on {'their' if len(keyless) > 1 else 'its'} free keyless "
-               f"tier, which is rate-limited; an API key lifts the limits"
+    base = NAME[BASELINE]
+    return ["## Limits", "", "### The judge", "",
+            f"- **One judge model.** One Claude model judges, by design: {judge_model}, the same model that ran the tasks. "
+            "Claude is the provider's real customer: it reads the results and writes the answer, so it ranks the answers "
+            "in light of the evidence. Recall and errors explain its ranking but don't decide it.",
+            "- **Forced order.** Near-equal answers are still forced into an order, so some \"above\" results are coin flips.",
+            "- **Relative recall.** \"Complete\" means what the providers found together.",
+            *capped_limit(T, model),
+            "- **Formats differ.** Each provider's results have their own format (JSON, text blocks, or summaries written by "
+            f"the {base} tool), so the judge can tell the runs apart by format, though it isn't told which provider is "
+            "which.",
+            "", "### The runs", "",
+            "- **One run per provider per task.** The same task run again can search differently and land on a better or "
+            "worse answer, so a single task's result partly reflects luck. Across many tasks this mostly evens out.",
+            f"- **Built-in search alongside.** A provider's results mean that provider plus {base}: the MCP runs kept {base} "
+            "available.",
+            *([f"- **Keyless tier.** {' and '.join(LONG[e] for e in keyless)} ran on {'their' if len(keyless) > 1 else 'its'} "
+               "free keyless tier, which is rate-limited; an API key lifts the limits"
                + (" and comes with free monthly credit." if all(e in (FREE or {}) for e in keyless) else ".")]
               if keyless else []),
-            "- Your tasks only. The verdict reflects the questions in these sessions and the web on the run dates; a "
+            *([f"- **Early stop.** {stop_note}"] if stop_note else []),
+            "", "### The sample", "",
+            f"- **No error bars.** The verdict is a judgment, not a significance test: with {n} tasks, a few tasks can "
+            "swing a close call.",
+            "- **Your tasks only.** The verdict reflects the questions in these sessions and the web on the run dates; a "
             "different mix of questions could change it.", ""]
 
 
-def diagnostics_md(check, extra=()):
+def diagnostics_md(check, extra=(), coverage=()):
     out = ["## Diagnostics", ""]
-    status = {"ok": "passed the number check on the first try.",
-              "retry": "failed the number check once and passed on the retry.",
-              "fallback": "was not usable (failed number check or failed call); the report shows an automatic verdict "
+    status = {"ok": "Passed the number check on the first try.",
+              "retry": "Failed the number check once and passed on the retry.",
+              "fallback": "Was not usable (failed number check or failed call); the report shows an automatic verdict "
                           "instead."}[check["status"]]
-    out.append(f"- Verdict: {status}")
+    out.append(f"- **Verdict:** {status}")
     for r in check["rejected"]:
         out.append(f"  - Rejected: \"{r['text']}\" Unsupported: {', '.join(r['unsupported'])}.")
     out += [f"- {x}" for x in extra]
+    if coverage:
+        out += ["", "### How far each Why statement holds", "",
+                "Tasks where the check kept each statement, of the set it was written for.", "", *coverage]
     return out + [""]
 
 
@@ -1130,12 +1216,13 @@ def main(argv):
     judges = max(len(t["grades"]) for t in T.values())
     heads, tasks = task_heads(judges), [task_data(k, t, order, judges, titles.get(k)) for k, t in T.items()]
     writer_model = counted(cache.models) if cache.models else (model or "your default model")
-    method = methodology_md(len(T), judge_model, judges, cost_usd is not None, why_coverage(why),
-                            no_instr).splitlines()
+    method = methodology_md(len(T), judge_model, no_instr)
+    metrics = metrics_md(cost_usd is not None)
     config = config_md(T, run_cfg, judge_model, writer_model, dates, hs, sample_sentence(rcfg), rr)
-    limits = limits_md(T, judge_model, keyless, model, stats.get("stop_note"))
-    diag = diagnostics_md(check, notes + [f"Instructions: {w}" for w in stats.get("instruction_warnings") or []])
-    md += ["", *per_task_md(T, order, judges, titles, tasks, heads), *method, "", *config, *limits, *diag]
+    limits = "\n".join(limits_md(T, judge_model, keyless, model, stats.get("stop_note"))).splitlines()
+    diag = diagnostics_md(check, notes + [f"Instructions: {w}" for w in stats.get("instruction_warnings") or []],
+                          why_coverage(why))
+    md += ["", *per_task_md(T, order, judges, titles, tasks, heads), *method, "", *metrics, *config, *limits, *diag]
     write_text(out_md, md_safe("\n".join(md)))
     shutil.copyfile(ASSETS / "method.svg", out_md.parent / "method.svg")
 
@@ -1144,10 +1231,13 @@ def main(argv):
     parts["heads"] = heads
     # MCP providers in config order: each keeps its color in the HTML; the baseline is grey
     parts["providers"] = [NAME[e] for e in PROVIDERS if e != BASELINE]
-    parts["sections"] = [("How the grades explain the ranking",
-                          md_block([f"- {ln}" for ln in computed(T, order, len(T), lambda k: f"[{k}](#task-{k})")])),
-                         ("Methodology", md_block(method, svgs)), ("Configuration", md_block(config)),
-                         ("Limits", md_block(limits)), ("Diagnostics", md_block(diag))]
+    parts["sections"] = [("How the grades explain the ranking", md_block([BUCKETS_NOTE, "", *(f"- **{t}:** {d}" for t, d in BUCKETS), "",
+                                    *computed_table(T, order, lambda k: f"[{k}](#task-{k})")])),
+                         ("Methodology", md_block(method, svgs)),
+                         ("Metrics", md_block(metrics)),
+                         ("Configuration", md_block(config)),
+                         ("Limits", md_block(limits)),
+                         ("Diagnostics", md_block(diag))]
     out_html = out_md.with_suffix(".html")
     write_text(out_html, render(parts))
     import export

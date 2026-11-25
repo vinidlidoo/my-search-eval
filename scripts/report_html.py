@@ -203,9 +203,36 @@ details[open]{padding-bottom:12px}
 #task .pv details.raw{margin-top:4px;border-top:0}#task .pv details.raw>summary{padding:4px 0;font-weight:500;font-size:.85rem;color:var(--muted)}
 .pv .meta{color:var(--muted);font-size:.85rem}.pv .flag{color:var(--bad);font-weight:650;font-size:.8rem;
  text-transform:uppercase;letter-spacing:.04em;margin-left:6px}
-.sections details{padding:0 4px}.sections details:last-child{border-bottom:1px solid var(--line)}
-.sections details[open]{padding-bottom:20px}
-.sections p,.sections ul,.sections ol{max-width:72ch}
+.sections>details{padding:0 24px}.sections>details:first-child{border-top:0}
+.sections>details>summary{padding:18px 0;flex-wrap:wrap;column-gap:12px;row-gap:2px}
+.sections .st{font-size:1.125rem;font-weight:650;letter-spacing:-.01em}
+.sections>details[open]{padding-bottom:24px}
+.sb>:first-child{margin-top:0}.sb p,.sb ol:not(.steps),.sb ul:not(.terms){max-width:72ch}.sb p{margin:12px 0}
+.mh{font-size:.8125rem;font-weight:650;color:var(--muted);margin:20px 0 4px;padding-top:20px;border-top:1px solid var(--line)}
+.sb>.mh:first-of-type{border-top:0;padding-top:0}.sb>.mh:first-child{margin-top:4px}
+.callout{background:var(--inset);border-radius:10px;padding:12px 16px;font-size:.95rem;max-width:72ch}
+ul.terms,ol.steps{list-style:none;padding:0;margin:0}
+.terms>li{display:grid;grid-template-columns:9.5rem minmax(0,1fr);gap:2px 24px;padding:12px 0;margin:0;
+ border-top:1px solid var(--line)}.terms>li:first-child{border-top:0}
+.terms>li>div{max-width:84ch}.term{font-weight:600}
+ol.steps{counter-reset:step}.steps>li{counter-increment:step;position:relative;padding:12px 0 12px 40px;margin:0}
+.steps>li::before{content:counter(step);position:absolute;left:0;top:13px;width:26px;height:26px;border-radius:50%;
+ display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:.8rem;font-weight:650}
+.steps .term{display:inline;margin-right:.35em}.steps .term::after{content:"."}.steps>li>div{display:inline}
+.steps>li{max-width:calc(84ch + 40px)}
+ul.sub{list-style:disc;margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.94rem}ul.sub li{margin:4px 0}
+.sb details.dd{border-top:0;margin-top:2px;padding-bottom:0}
+.sb details.dd>summary{display:inline-flex;padding:4px 0;font-weight:500;font-size:.85rem;color:var(--muted);gap:8px}
+.sb details.dd>summary:hover{color:var(--text)}.sb details.dd[open]>summary{color:var(--text)}
+.sb details.dd>ul.sub{margin-top:2px}.sb p.tools{margin:4px 0 0;line-height:1.9}
+.mt{container-name:mt;padding:0;margin:8px 0 0}.mt table{font-size:.92rem}
+table.mt th,table.mt td{white-space:normal;vertical-align:top;text-align:left;padding:10px 16px 10px 0}
+table.mt .n{text-align:right;white-space:nowrap}table.mt tr>:last-child{padding-right:0}
+table.mt td:first-child{font-weight:600}.tw.mt{max-width:52rem}table.mt td:nth-child(2):not(.n){min-width:15rem}
+@media (max-width:600px){.sections>details{padding:0 16px}.sections>details>summary{row-gap:4px}
+ .terms>li{display:block;padding:14px 0}.term{display:block;margin-bottom:4px}
+ .steps>li{padding-left:32px}.steps>li::before{width:22px;height:22px;top:14px;font-size:.75rem}.steps .term{display:inline}
+ ul.sub{padding-left:14px}}
 ul,ol{padding-left:22px}li{margin:5px 0}
 .diagram{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0}
 .diagram svg{display:block;max-width:100%;height:auto}.diagram .tall{display:none}
@@ -228,7 +255,12 @@ ul,ol{padding-left:22px}li{margin:5px 0}
  .clamp{max-height:none;-webkit-mask-image:none;mask-image:none}
  h2,h3,.why-head,summary{break-after:avoid}
  .why li,.vs,tr,.verdict,.errs li,.diagram{break-inside:avoid}.ex a.tlink{background:none;padding:0}}
-""" + STACK.format(name="task", width="40rem") + """
+""" + STACK.format(name="task", width="40rem") + STACK.format(name="mt", width="34rem") + """
+.tw.mt{padding:0}
+@container mt (width < 34rem){.mt td:first-child{grid-column:1/-1}.mt td:first-child::before{display:none}
+ .mt tr{grid-template-columns:repeat(auto-fit,minmax(4.5rem,1fr));gap:8px 12px;padding:12px 0}
+ .mt tr:has(>td:nth-child(3):last-child){grid-template-columns:minmax(0,1fr) auto}
+ table.mt td,table.mt td.n{padding:0;text-align:left;white-space:normal;min-width:0}}
 @container task (width < 40rem){
  .task tr{grid-template-columns:1.9rem 6.6rem 1fr auto;grid-template-areas:"rk nm nm er" ". rc rc rc" ". cx tm tm";
   gap:6px 10px;align-items:center;padding:14px 0}
@@ -398,22 +430,81 @@ def inline(s):
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
 
 
+LEAD = re.compile(r"^\*\*(.+?)[:.]?\*\*[:.]?\s*(.*)")  # "**Term:** text" or "**Term.** text"
+
+
+def md_list(items):
+    """[(indent, kind, text)] -> nested lists. A top-level list whose every item opens with a bold lead becomes a
+    two-column term list (bullets; its sub-items fold under "Details") or numbered steps (sub-items shown); sub-items
+    are quieter bullets."""
+    top = []
+    for ind, kind, text in items:
+        if ind and top:
+            top[-1][2].append(text)
+        else:
+            top.append((kind, text, []))
+    kind = top[0][0]
+    leads = [LEAD.match(t) for _, t, _ in top]
+    sub = lambda xs: f"<ul class='sub'>{''.join(f'<li>{inline(x)}</li>' for x in xs)}</ul>" if xs else ""  # noqa: E731
+
+    def fold(xs):  # a term's sub-items sit behind a quiet disclosure; the lead stays visible
+        if not xs:
+            return ""
+        if all(re.fullmatch(r"(`[^`]+`(, )?)+\.?", x) for x in xs):  # a list of tool names: one wrapped line
+            return f"<details class='dd'><summary>Tool names</summary><p class='tools'>{' '.join(map(inline, xs))}</p></details>"
+        return f"<details class='dd'><summary>Details</summary>{sub(xs)}</details>"
+    if all(leads):
+        cls = "steps" if kind == "ol" else "terms"
+        more = sub if kind == "ol" else fold
+        lis = "".join(f"<li><span class='term'>{inline(m[1])}</span><div>{inline(m[2])}{more(kids)}</div></li>"
+                      for m, (_, _, kids) in zip(leads, top))
+        return f"<{kind} class='{cls}'>{lis}</{kind}>"
+    return f"<{kind}>{''.join(f'<li>{inline(t)}{sub(kids)}</li>' for _, t, kids in top)}</{kind}>"
+
+
+def md_table(rows):
+    """Markdown table lines -> a table that stacks into labelled rows in a narrow container."""
+    cells = [[c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", r.strip().strip("|"))] for r in rows]
+    head, align, body = cells[0], cells[1], cells[2:]
+    num = [a.endswith(":") for a in align]
+    cls = lambda k: " class='n'" if num[k] else ""  # noqa: E731
+    ths = "".join(f"<th scope='col'{cls(k)}>{e(h)}</th>" for k, h in enumerate(head))
+    trs = "".join("<tr>" + "".join(f"<td{cls(k)} data-label='{e(head[k])}'>{inline(c)}</td>" for k, c in enumerate(r))
+                  + "</tr>" for r in body)
+    return f"<div class='tw mt'><table class='mt'><thead><tr>{ths}</tr></thead><tbody>{trs}</tbody></table></div>"
+
+
 def md_block(lines, svgs=()):
-    """Render the methodology-style Markdown: paragraphs, bullets, numbered lists, the diagram (svgs: wide, tall)."""
-    out, lst = [], None
+    """Render the methodology-style Markdown: paragraphs, ### sub-headings, nested bullets and numbered lists (bold
+    leads make term lists and steps), tables, "> " notes, the diagram (svgs: wide, tall)."""
+    out, items, rows = [], [], []
+
+    def flush():
+        if items:
+            out.append(md_list(items))
+            items.clear()
+        if rows:
+            out.append(md_table(rows))
+            rows.clear()
     for ln in lines:
-        m = re.match(r"^\s*(?:- |\d+\. )(.*)", ln)
-        kind = ("ol" if re.match(r"^\s*\d+\. ", ln) else "ul") if m else None
-        if lst and kind != lst:
-            out.append(f"</{lst}>")
-            lst = None
-        if m:
-            if not lst:
-                out.append(f"<{kind}>")
-                lst = kind
-            out.append(f"<li>{inline(m[1])}</li>")
-        elif ln.startswith("## "):
+        m = re.match(r"^(\s*)(- |\d+\. )(.*)", ln)
+        if m and (items or not m[1]):
+            if rows:
+                flush()
+            items.append((len(m[1]), "ul" if m[2] == "- " else "ol", m[3]))
+            continue
+        if ln.startswith("|"):
+            if items:
+                flush()
+            rows.append(ln)
+            continue
+        flush()
+        if ln.startswith("## "):
             continue  # the <details> summary carries the section title
+        elif ln.startswith("### "):
+            out.append(f"<h4 class='mh'>{inline(ln[4:])}</h4>")
+        elif ln.startswith("> "):
+            out.append(f"<p class='callout'>{inline(ln[2:])}</p>")
         elif ln.startswith("!["):
             if svgs:  # wide above 700px, stacked on phones; the visually hidden list is the text equivalent
                 wide, tall = (x.replace("<svg ", f'<svg class="{c}" ', 1) for c, x in zip(("wide", "tall"), svgs))
@@ -422,8 +513,7 @@ def md_block(lines, svgs=()):
                            + "".join(f"<li>{e(x)}</li>" for x in DIAGRAM_STEPS) + "</ol>")
         elif ln.strip():
             out.append(f"<p>{inline(ln)}</p>")
-    if lst:
-        out.append(f"</{lst}>")
+    flush()
     return "\n".join(out)
 
 
@@ -529,7 +619,8 @@ def render(d):
     head, rows = d["table"]["head"], d["table"]["rows"]
     # MCP providers cycle through 4 colors; the baseline (built-in search) is always grey ("b")
     idx = {n: i % 4 for i, n in enumerate(d["providers"])} | {d["baseline"]: "b"}
-    sections = "".join(f"<details><summary>{e(title)}</summary>{body}</details>" for title, body in d["sections"])
+    sections = "".join(f"<details><summary><span class='st'>{e(title)}</span></summary>"
+                       f"<div class='sb'>{body}</div></details>" for title, body in d["sections"])
     fallback = f"<p class='fallback'>{e(d['fallback'])}</p>" if d["fallback"] else ""
     notes = "".join(f"<p class='note'>{e(x)}</p>" for x in d.get("notes", []))
     data = json.dumps({"tasks": d["tasks"], "colors": idx, "heads": d["heads"]}).replace("<", "\\u003c")  # inert in <script>
@@ -560,7 +651,8 @@ def render(d):
 <span id="tlive" class="sr" aria-live="polite"></span>
 </div>
 <div id="task"></div></div></section>
-<section aria-labelledby="h-more"><h2 id="h-more">More</h2><div class="sections">{sections}</div></section>
+<section aria-labelledby="h-more"><h2 id="h-more">More</h2>
+<p class="dek">How the ranking breaks down, how the eval ran, and its limits.</p><div class="card sections">{sections}</div></section>
 </main>
 <script type="application/json" id="data">{data}</script>
 <script>{JS}</script>

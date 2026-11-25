@@ -431,7 +431,7 @@ class Report(FakeClaude):
         quiet(self.render, root)
         md = (root / "report.md").read_text()
         term = " ".join((root / "terminal.txt").read_text().split())
-        self.assertIn("Sample: drawn at random (seed 7), at most 3 per session; the task builder read 9 records and "
+        self.assertIn("Sample:** Drawn at random (seed 7), at most 3 per session; the task builder read 9 records and "
                       "dropped 2 (expired premise, or no fair public question), and the privacy check dropped 1", md)
         self.assertIn("This report covers 5 of the 6 tasks planned; the task builder kept 5", term)
         self.assertIn("Parallel: 1 call to unpriced tools not included in its cost: search_vertical (1).", term)
