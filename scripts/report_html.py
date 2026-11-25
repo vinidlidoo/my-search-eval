@@ -23,8 +23,9 @@ STACK = """
  .{name} th,.{name} td{{display:block;padding:0;border:0;text-align:left;white-space:normal}}
  .{name} tbody th{{grid-column:1/-1;font-size:1.02rem}}
  .{name} td.m,.{name} td.c{{padding:0;text-align:left;width:auto}}
- .{name} td::before{{content:attr(data-label);display:block;font-size:.68rem;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--muted);font-weight:650;margin-bottom:3px;white-space:nowrap}}
+ .{name} td::before{{content:attr(data-label);display:block;font-size:.75rem;letter-spacing:0;
+  text-transform:none;color:var(--muted);font-weight:500;margin-bottom:3px;white-space:nowrap}}
+ .{name} .meter>span{{justify-self:start}}
  .{name} .meter{{display:grid;grid-template-columns:1fr;gap:5px;justify-items:start;width:100%}}
  .{name} .meter i{{max-width:7rem}}}}
 """
@@ -52,8 +53,10 @@ header{padding-bottom:28px}
 .eyebrow{font-size:.8rem;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
 .hero{margin-top:8px}
 h1{font-size:clamp(1.6rem,3.5vw,2.2rem);letter-spacing:-.025em;font-weight:750;max-width:30ch}
-h2{font-size:1.5rem;letter-spacing:-.015em;font-weight:700;margin:72px 0 6px}
-.dek{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+h2{font-size:1.5rem;letter-spacing:-.015em;font-weight:700;margin:56px 0 4px}
+.dek{color:var(--muted);margin:0 0 16px;font-size:.95rem}
+small.q{font-size:.8125rem;color:var(--muted)}
+@media (max-width:600px){h2{margin-top:40px}}
 h3{font-size:1.2rem;font-weight:650;letter-spacing:-.01em}
 a{color:var(--accent);text-underline-offset:2px}a:hover{text-decoration-thickness:2px}
 code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--inset);padding:1px 5px;border-radius:5px}
@@ -62,24 +65,26 @@ code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:v
 .num{font-variant-numeric:tabular-nums}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:clip}
 .prose{max-width:72ch}
-.verdict{padding:28px 32px;font-size:1.05rem;background:linear-gradient(180deg,var(--accent-soft),var(--surface) 75%);
+.verdict{padding:28px 32px 24px;background:linear-gradient(180deg,var(--accent-soft),var(--surface) 75%);
  box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 18%,transparent),var(--shadow);border-color:transparent}
-.verdict .lead{display:flex;align-items:center;font-size:2.2rem;font-weight:750;letter-spacing:-.02em;line-height:1.2;
+.verdict .lead{display:flex;align-items:center;font-size:1.75rem;font-weight:720;letter-spacing:-.02em;line-height:1.2;
  margin-bottom:10px}
 .verdict .lead .dot{width:.42em;height:.42em;margin-right:.35em}
-.verdict p{margin:0;max-width:64ch;color:var(--muted);font-size:.98rem}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:12px;margin:18px 0 20px}
-.kpi b small{display:block;font-size:.5em;font-weight:500;color:var(--muted);margin-top:2px}
-@media (min-width:860px){.verdict.has-kpis{display:grid;grid-template-columns:1fr minmax(19rem,24rem);gap:6px 36px;align-items:start}.verdict.has-kpis .lead{grid-column:1}.verdict.has-kpis>p{grid-column:1}.verdict.has-kpis .kpis{grid-column:2;grid-row:1/span 3;grid-template-columns:1fr 1fr;margin:0}}
-.kpi{background:color-mix(in srgb,var(--surface) 70%,transparent);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-.kpi b{display:block;font-size:1.55rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
-.kpi span{font-size:.82rem;color:var(--muted)}.fallback{color:var(--muted);font-size:.9rem;margin:10px 0 0}
+.verdict p{margin:0;max-width:68ch;color:var(--muted);font-size:1rem}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);margin:24px 0 0;padding-top:20px;border-top:1px solid var(--line)}
+.kpi{display:flex;flex-direction:column;gap:4px;padding:0 20px;min-width:0}.kpi:first-child{padding-left:0}
+.kpi+.kpi{border-left:1px solid var(--line)}
+.kpi span{font-size:.8125rem;color:var(--muted);white-space:nowrap}
+.kpi b{font-size:1.5rem;font-weight:650;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
+.kpi b small{font-size:.8125rem;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:6px}.fallback{color:var(--muted);font-size:.9rem;margin:10px 0 0}
 .dot{display:inline-block;width:.6em;height:.6em;border-radius:50%;background:var(--c);margin-right:.5em;
  vertical-align:.05em;flex:none}
 .e0{--c:var(--e0)}.e1{--c:var(--e1)}.e2{--c:var(--e2)}.e3{--c:var(--e3)}.eb{--c:var(--eb)}
 .tw{container-type:inline-size;padding:0 18px}.tw.task{container-name:task}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
-table.eng{min-width:52rem}.eng th,.eng td{padding:14px 11px}.eng thead th{white-space:nowrap}
+table.eng{min-width:52rem}.eng th,.eng td{padding:13px 12px}
+.eng thead th{white-space:nowrap;text-transform:none;letter-spacing:0;font-size:.8125rem;font-weight:500;padding-block:11px;
+ background:var(--inset)}.eng thead th:first-child{background:var(--inset)}.eng th.m{width:1%}
 .eng tbody tr.pick>*{background:color-mix(in srgb,var(--accent-soft) 70%,var(--surface))}.eng tr.pick>th{box-shadow:inset 3px 0 0 var(--c)}
 .scroll.can-scroll{background:linear-gradient(to left,var(--surface),transparent 28px) right/28px 100% no-repeat local,radial-gradient(farthest-side at 100% 50%,light-dark(rgb(0 0 0/.2),rgb(255 255 255/.16)),transparent) right/14px 100% no-repeat scroll}
 .swipe{display:none;color:var(--muted);font-size:.85rem;margin:8px 2px 0}@media (max-width:600px){.swipe.on{display:block}}
@@ -87,39 +92,44 @@ table.eng{min-width:52rem}.eng th,.eng td{padding:14px 11px}.eng thead th{white-
 .eng tr>:last-child{padding-right:20px}
 table{border-collapse:collapse;width:100%;font-size:.94rem}
 th,td{padding:12px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-thead th{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;
+thead th{font-size:.8125rem;letter-spacing:0;text-transform:none;color:var(--muted);font-weight:500;
  border-bottom:1px solid var(--line);white-space:normal;vertical-align:bottom}
 thead th[title]{cursor:help}
 tbody th,tbody td{border-bottom:1px solid var(--line)}tbody tr:last-child>*{border-bottom:0}
 tr>:first-child{text-align:left;padding-left:0}tr>:last-child{padding-right:0}tbody th{font-weight:600}
-.meter{display:inline-grid;grid-template-columns:3.1rem 4rem;gap:6px;align-items:center;justify-items:start}
-.meter>span{line-height:1;order:-1}
-th.m,td.m{text-align:left;padding-left:18px}th.c,td.c{text-align:center;width:4.5rem}
-.meter i{width:100%;height:8px;border-radius:4px;
+.meter{display:inline-grid;grid-template-columns:2.6rem 4.5rem;gap:10px;align-items:center;justify-items:start}
+.meter>span{line-height:1;order:-1;justify-self:end}
+th.m,td.m{text-align:left}th.c,td.c{text-align:center;width:4.5rem}
+.meter i{width:100%;height:6px;border-radius:3px;
  background:linear-gradient(90deg,var(--c,var(--accent)) calc(var(--v)*100%),var(--track) 0)}
 .legend{margin:10px 2px 0;border:0}
 .legend summary{font-size:.88rem;color:var(--muted);font-weight:600;padding:6px 0}
 .defs{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:12px 24px;margin:8px 0 4px;
  font-size:.82rem;color:var(--muted);line-height:1.5}
 .defs b{display:block;color:var(--text);font-weight:600}
-.h2h{padding:4px 22px}
-.vs{padding:16px 0;border-bottom:1px solid var(--line)}.vs:last-child{border-bottom:0}
-.vs .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
-.vs .side{display:flex;align-items:baseline;gap:8px;min-width:0}.vs .side.r{flex-direction:row-reverse;text-align:right}
-.vs .dot{margin:0;align-self:center}@media (max-width:480px){.vs .pc{display:none}}
-.vs .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.vs .ct{font-size:1.25rem;font-weight:750;font-variant-numeric:tabular-nums;line-height:1}
-.vs .pc{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
-.split{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:3px}
-.split .a{background:var(--a)}.split .b{background:var(--b)}
+.h2h{display:grid;grid-template-columns:max-content max-content 1fr max-content max-content;
+ padding:6px 24px}
+.vs{display:contents}
+.vs>*{display:flex;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.vs:last-child>*{border-bottom:0}
+.vs .nm{font-weight:600;white-space:nowrap}.vs .nm.r{justify-content:flex-end}.vs .nm.r .dot{margin:0 0 0 .5em}.vs .nm.l,.vs .n.l{padding-right:16px}.vs .nm.r,.vs .n.r{padding-left:16px}
+.vs .n{align-items:baseline;align-content:center;flex-wrap:wrap;font-variant-numeric:tabular-nums;white-space:nowrap;justify-content:flex-end}
+.vs .n.r{justify-content:flex-start}
+.vs .ct{font-weight:650;min-width:2ch;text-align:right}.vs .pc{color:var(--muted);font-size:.875rem;margin-left:6px}
+.split{gap:2px}.split>span{height:6px}
+.split .a{background:var(--a);border-radius:4px 0 0 4px}.split .b{background:var(--b);border-radius:0 4px 4px 0}
+@media (max-width:600px){.h2h{display:block;padding:4px 16px}
+ .vs{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"nl . nr" "cl . cr" "bar bar bar";gap:2px 8px;
+  padding:14px 0;border-bottom:1px solid var(--line)}.vs:last-child{border-bottom:0}
+ .vs>*,.vs .nm.l,.vs .n.l,.vs .nm.r,.vs .n.r{padding:0;border:0}.vs .nm.r{justify-content:flex-end}.vs .nm.l{grid-area:nl}.vs .nm.r{grid-area:nr}.vs .n.l{grid-area:cl;justify-content:flex-start}
+ .vs .n.r{grid-area:cr;justify-content:flex-end}.vs .split{grid-area:bar;padding-top:8px}}
 .note{color:var(--muted);font-size:.88rem;margin:12px 2px 0}
 .why-g{padding:18px 22px 6px}.why-g+.why-g{margin-top:16px}
-.why .why-head{display:flex;align-items:center;font-size:1.08rem;font-weight:700;margin:0;padding-bottom:10px}
+.why .why-head{display:flex;align-items:baseline;font-size:1.08rem;font-weight:700;margin:0;padding-bottom:10px}
 .why li>:last-child{max-width:70ch}
 .why ul{list-style:none;padding:0;margin:0}
 .why li{display:grid;grid-template-columns:7.5rem 1fr;gap:4px 16px;align-items:baseline;padding:14px 0;margin:0;
  border-top:1px solid var(--line)}
-.why .favor-head{font-size:.85rem;font-weight:600;color:var(--muted);margin:0;padding:18px 0 4px;border-top:1px solid var(--line)}
+.why .favor-head{font-size:.85rem;font-weight:500;color:var(--muted);margin:0;padding:18px 0 4px;border-top:1px solid var(--line)}
 .why .favor-head+ul li:first-child{border-top:0}
 .why details.also{display:inline}.why details.also summary{display:inline;cursor:pointer;color:var(--muted);font-size:.82rem;
  list-style:none;margin-left:6px;white-space:nowrap;border:1px solid var(--line-strong);border-radius:999px;padding:0 8px;font-weight:600}.why details.also summary::-webkit-details-marker{display:none}
@@ -128,9 +138,9 @@ th.m,td.m{text-align:left;padding-left:18px}th.c,td.c{text-align:center;width:4.
 @media (max-width:600px){.why-g{padding:14px 16px 4px}.why li{display:block}.why li .tag::after{content:" · ";color:var(--muted)}}
 .dot.ring{background:none;box-shadow:inset 0 0 0 2px var(--c)}
 .also{color:var(--muted)}
-.tag{font-size:.88rem;font-weight:650;color:var(--text);white-space:nowrap}
+.tag{font-size:.8125rem;font-weight:500;color:var(--muted);white-space:nowrap}
 a.tlink{text-decoration-color:color-mix(in srgb,var(--accent) 40%,transparent);font-variant-numeric:tabular-nums}
-.ex{white-space:nowrap}.ex a.tlink{display:inline-block;padding:0 2px;margin:0;border-radius:4px;background:var(--accent-soft);text-decoration:none;
+.ex{white-space:nowrap}.ex a.tlink{display:inline-block;padding:0 8px;margin:0;border-radius:999px;font-size:.82rem;line-height:1.5;background:var(--accent-soft);text-decoration:none;
  font-size:.9em;font-weight:600;line-height:1.6}
 .ex a.tlink:hover{text-decoration:underline}
 .viewer{overflow:clip}
@@ -150,7 +160,7 @@ select{height:34px;font:inherit;font-size:.92rem;border-radius:8px;border:1px so
 .nav label.pick{position:relative;flex:0 1 auto;min-width:0;margin-left:0}.nav label.pick select{appearance:none;-webkit-appearance:none;width:100%;padding:0 34px 0 12px;font-weight:500;cursor:pointer}.nav label.pick::after{content:"";position:absolute;right:14px;top:50%;width:7px;height:7px;pointer-events:none;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
 #task{padding:24px 20px 20px}
 #task h3:focus{outline:none}#task h3:focus-visible{outline:2px solid var(--accent)}
-.tn{display:block;font-size:.85rem;color:var(--muted);font-weight:600;
+.tn{display:block;font-size:.85rem;color:var(--muted);font-weight:500;
  margin-bottom:6px}
 .prompt{margin:16px 0 0;background:var(--inset);border-radius:10px;padding:14px 16px}
 .clamp{overflow:hidden;max-height:calc(var(--lines)*1lh);
@@ -167,7 +177,7 @@ select{height:34px;font:inherit;font-size:.92rem;border-radius:8px;border:1px so
 .chip{display:inline-block;padding:1px 9px;border-radius:999px;font-size:.82rem;font-weight:600;white-space:nowrap}
 .chip.none{color:var(--muted);font-weight:500;padding:0}
 .chip.side{color:var(--warn);background:var(--warn-soft)}.chip.main{color:var(--bad);background:var(--bad-soft)}
-.label{display:block;font-size:.85rem;color:var(--muted);font-weight:600;
+.label{display:block;font-size:.85rem;color:var(--muted);font-weight:500;
  margin-bottom:4px}
 .reason{margin:20px 0 0}
 .errs{margin:20px 0 0;padding:0 0 0 14px;border-left:2px solid var(--bad)}
@@ -182,8 +192,8 @@ details[open]>summary::before{transform:rotate(45deg)}
 details[open]{padding-bottom:12px}
 #task details{margin-top:20px}
 #task details.pv{margin-top:0}#task details.pv:last-child{border-bottom:1px solid var(--line)}
-.pv>summary{font-weight:600}.pv>summary .cnt{margin-left:auto;font-weight:500}.pv>summary::before{order:9;margin-left:12px}#task .reason{margin:18px 0 0}
-.task table.task{width:auto;min-width:min(40rem,100%)}.task th,.task td{padding-inline:12px 28px}.pv .body{display:grid;gap:12px;min-width:0}
+.pv>summary{font-weight:600;gap:8px}.pv .body p{margin:0}.pv>summary .cnt{margin-left:auto;font-weight:500}.pv>summary::before{order:9;margin-left:12px}#task .reason{margin:18px 0 0}
+.task table.task{width:100%}.task th,.task td{padding-inline:12px 28px}.pv .body{display:grid;gap:12px;min-width:0}
 .pv pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
  background:var(--soft,rgba(127,127,127,.08));border-radius:8px;padding:10px 12px;max-height:28em;overflow:auto}
 .pv ol.calls{padding-left:22px;margin:0}.pv ol.calls>li{margin:0 0 16px}
@@ -208,7 +218,7 @@ ul,ol{padding-left:22px}li{margin:5px 0}
 @media (max-width:700px){.diagram{display:none}.hint{display:none}}
 @media (max-width:600px){
  main{padding:32px 16px 64px}h2{margin-top:44px}.verdict{padding:20px}.verdict .lead{font-size:1.5rem}
- .h2h{padding:4px 16px}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
+ .kpis{grid-template-columns:1fr 1fr;gap:16px 0}.kpi:nth-child(odd){padding-left:0;border-left:0}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
 @media (pointer:coarse){.also a.tlink{display:inline-block;min-height:24px;padding:2px 3px}}
 @media (prefers-reduced-motion:no-preference){
  #task.swap{animation:fade .18s ease-out}
@@ -225,7 +235,7 @@ ul,ol{padding-left:22px}li{margin:5px 0}
  .why li,.vs,tr,.verdict,.errs li,.diagram{break-inside:avoid}.ex a.tlink{background:none;padding:0}}
 """ + STACK.format(name="task", width="40rem") + """
 @container task (width < 40rem){.task tr{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px;padding:12px 0}
- .task td::before{font-size:.62rem}}
+ .task td::before{font-size:.72rem}}
 """
 
 JS = """
@@ -412,8 +422,8 @@ def md_block(lines, svg=""):
 def meter(c, cls=""):
     """A {"text", "value", "max"} cell as a zero-based bar beside the text (non-zero values get a visible sliver);
     a cell without a max is plain text."""
-    if not c.get("max"):
-        return e(c["text"])
+    if not c.get("max"):  # "$0 (free tier)": the parenthesis as a quiet note
+        return re.sub(r"^(.+?) \((.+)\)$", r"\1 <small class='q'>\2</small>", e(c["text"]))
     v = min(1, c["value"] / c["max"])
     return (f'<span class="meter {cls}" style="--v:{max(v, .03) if v else 0:.3f}">'
             f'<i aria-hidden="true"></i><span>{e(c["text"])}</span></span>')
@@ -423,8 +433,7 @@ def dot(i, ring=False):
     return f'<span class="dot{" ring" if ring else ""} e{i}" aria-hidden="true"></span>'
 
 
-SHORT = {"Monthly cost": "Cost / month", "Context tokens": "Context", "List fee per task": "Fee / task",
-         "Errors (main / side)": "Errors main / side"}  # one-line headers; the legend has the full names
+SHORT = {"Monthly cost": "Cost / month", "Context tokens": "Context", "List fee per task": "Fee / task"}  # one-line headers; the legend has the full names
 
 
 def providers_table(head, rows, idx, defs, pick=None):
@@ -462,11 +471,13 @@ def head_to_head(above, idx):
         y = n - x
         pa, pb = (f"{round(100 * v / n)}%" if n else "" for v in (x, y))
         out.append(f'<div class="vs" role="img" aria-label="{e(a)} ranked above {e(b)} on {x:g} of {n} tasks; '
-                   f'{e(b)} above {e(a)} on {y:g}"><div class="top" aria-hidden="true">'
-                   f'<span class="side">{dot(idx[a])}<span class="nm">{e(a)}</span><span class="ct">{x:g}</span><span class="pc">{pa}</span></span>'
-                   f'<span class="side r">{dot(idx[b])}<span class="nm">{e(b)}</span><span class="ct">{y:g}</span><span class="pc">{pb}</span></span></div>'
+                   f'{e(b)} above {e(a)} on {y:g}">'
+                   f'<span class="nm l" aria-hidden="true">{dot(idx[a])}{e(a)}</span>'
+                   f'<span class="n l" aria-hidden="true"><span class="ct">{x:g}</span><span class="pc">{pa}</span></span>'
                    f'<span class="split" style="--a:{ca};--b:{cb}" aria-hidden="true">'
-                   f'<span class="a" style="flex:{x:g}"></span><span class="b" style="flex:{y:g}"></span></span></div>')
+                   f'<span class="a" style="flex:{x:g}"></span><span class="b" style="flex:{y:g}"></span></span>'
+                   f'<span class="n r" aria-hidden="true"><span class="ct">{y:g}</span><span class="pc">{pb}</span></span>'
+                   f'<span class="nm r" aria-hidden="true">{e(b)}{dot(idx[b])}</span></div>')
     return f'<div class="card h2h">{"".join(out)}</div>'
 
 
@@ -478,12 +489,12 @@ def verdict_html(text, pick, idx, head=(), row=None):
     if row:
         cells = dict(zip(head[1:], row["cells"]))
         val = lambda t: re.sub(r"^(.+?) \((.+)\)$", r"\1<small>\2</small>", e(t))  # noqa: E731
-        tiles = "".join(f"<div class='kpi'><b>{val(cells[h]['text'])}</b><span>{e(h)}</span></div>" for h in KPI if h in cells)
+        tiles = "".join(f"<div class='kpi'><span>{e(h)}</span><b>{val(cells[h]['text'])}</b></div>" for h in KPI if h in cells)
         tiles = f"<div class='kpis'>{tiles}</div>" if tiles else ""
     m = re.match(r"(.+?\.)\s+(.+)", text, re.S)
     if not m or len(m[1]) > 60:
-        return f"{tiles}<p>{e(text)}</p>"
-    return f'<span class="lead">{dot(idx[pick])}{e(m[1])}</span>{tiles}<p>{e(m[2])}</p>'
+        return f"<p>{e(text)}</p>{tiles}"
+    return f'<span class="lead">{dot(idx[pick])}{e(m[1])}</span><p>{e(m[2])}</p>{tiles}'
 
 
 def why_html(why, idx):
