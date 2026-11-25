@@ -550,9 +550,10 @@ def gaps(T, a, b):
 
 
 def groups(T, agg, w, r):
-    """Fixed task sets the writer explains, per provider o compared with the pick w (the runner-up r first): the
-    columns where w's lead in tasks is largest, then the one column with the most tasks in o's favor, WHY_CAP in all.
-    {gid: {"label", "ks", "frame", "pair", "tag", "cat", "favor"}}, in display order."""
+    """Fixed task sets the writer explains, per provider o compared with the pick w (the runner-up r first): every
+    column where w leads, in column order, then the one column with the most tasks in o's favor. cap() keeps the
+    largest leads among the bullets that pass the check, so a dropped bullet frees its slot.
+    {gid: {"label", "ks", "frame", "pair", "tag", "cat", "favor", "lead"}}, in display order."""
     out = {}
     for o in [r] + [e for e in PROVIDERS if e not in (w, r)]:
         up, down = gaps(T, w, o), gaps(T, o, w)
@@ -560,8 +561,7 @@ def groups(T, agg, w, r):
         lead = sorted((c for c in CATS if len(up[c]) > len(down[c]) and len(up[c]) >= need(c)),
                       key=lambda c: len(down[c]) - len(up[c]))
         favor = max((c for c in CATS if len(down[c]) >= need(c)), key=lambda c: len(down[c]), default=None)
-        lead = sorted(lead[:WHY_CAP - (favor is not None)], key=list(CATS).index)  # biggest leads, in column order
-        picks = [(c, False) for c in lead] + ([(favor, True)] if favor else [])
+        picks = [(c, False) for c in sorted(lead, key=list(CATS).index)] + ([(favor, True)] if favor else [])
         for c, fav in picks:
             ks = down[c] if fav else up[c]
             who, other = (Oth, W) if fav else (W, Oth)
@@ -572,7 +572,19 @@ def groups(T, agg, w, r):
                 CATS[c][2 if fav else 1].format(W=W, O=Oth)
             out[f"{o}-{c}{'-favor' if fav else ''}"] = {"label": f"the {len(ks)} tasks where {what}", "ks": ks,
                                                          "frame": frame, "pair": (w, o), "tag": CATS[c][0], "cat": c,
-                                                         "favor": fav}
+                                                         "favor": fav, "lead": len(up[c]) - len(down[c])}
+    return out
+
+
+def cap(why, groups_):
+    """Per compared provider, at most WHY_CAP kept bullets: the point in its favor, and the largest leads, in column
+    order."""
+    out = []
+    for o in dict.fromkeys(b["pair"][1] for b in why):
+        mine = [b for b in why if b["pair"][1] == o]
+        favor = [b for b in mine if b["favor"]][:1]
+        lead = sorted((b for b in mine if not b["favor"]), key=lambda b: -groups_[b["gid"]]["lead"])[:WHY_CAP - len(favor)]
+        out += [b for b in mine if b in lead or b in favor]
     return out
 
 
@@ -902,7 +914,7 @@ The ranking decides every per-task outcome in this report. Recall and errors are
 - Ranked best: tasks where a provider's answer was ranked first.
 - Head to head: tasks where one provider's answer was ranked above another's.
 - Verdict: one LLM call reads every number in this report's summary (ranked best, recall, errors, ranked above and how the grades explain it, monthly cost after free tiers, keyless limits, context tokens, time) and each task with the judge's grades and notes. It picks the provider it judges would make Claude most useful to you, {base} included, weighing the metrics itself with no fixed thresholds, and names the runner-up. Code checks that every number the verdict cites is among the summary numbers in its input; otherwise it retries once. If it still fails, or the call fails, the report names the provider ranked best most often instead.
-- Why: for each other provider, code picks fixed sets of tasks by the Providers table's columns: where the recommended provider had more recall, where only the other provider's answer had an error on the main point, or only on a side point, and where the judge ranked the recommended provider above on its own call. It keeps the columns where the recommended provider leads by the most tasks, plus the one column with the most tasks in the other provider's favor, {WHY_CAP} bullets at most, each tagged with its column. An LLM names what made the difference in each set, from the judge's notes, with an example. A check call keeps only the tasks where each statement holds; a failing bullet is rewritten once and rechecked, or dropped. A set needs at least {MIN_GROUP} tasks, and a statement is kept only if the check confirms it on at least {MIN_GROUP}; an error on the main point needs one. With none, the report has no Why section and says why.
+- Why: for each other provider, code picks fixed sets of tasks by the Providers table's columns: where the recommended provider had more recall, where only the other provider's answer had an error on the main point, or only on a side point, and where the judge ranked the recommended provider above on its own call. Every column where the recommended provider leads gets a set, plus the one column with the most tasks in the other provider's favor; after the check, the report keeps the point in the other provider's favor and the largest leads, {WHY_CAP} bullets at most, each tagged with its column. An LLM names what made the difference in each set, from the judge's notes, with an example. A check call keeps only the tasks where each statement holds; a failing bullet is rewritten once and rechecked, or dropped. A set needs at least {MIN_GROUP} tasks, and a statement is kept only if the check confirms it on at least {MIN_GROUP}; an error on the main point needs one. With none, the report has no Why section and says why.
 - How the grades explain the ranking: each task where one answer was ranked above another is put in one bucket by the judge's own grades. More recall: the higher-ranked run's evidence held more. Fewer errors: equal recall, and the lower-ranked answer had the worse error. Judge's call: everything else.
 {cost}- Context tokens: the size of the search and fetch results a run put into Claude's context, estimated at 4 characters per token. Time: the headless session's wall time, from task to final answer.
 """ + ("\n**How far each Why statement holds** (tasks where the check kept it, of the set it was written for)\n\n"
@@ -1160,7 +1172,7 @@ def write_why(cache, T, agg, order, w, r, model):
     ctx += ["# All tasks (for titles)", *(f"- Task {k}: {' '.join(t['task']['task'].split())[:300]}" for k, t in T.items())]
     prompt, system = "\n".join(ctx), (PROMPTS / "report.md").read_text()
     out = cached(cache, [system, prompt], model, lambda: ask(prompt, system, WHY_SCHEMA, model))
-    why = check_why(cache, out["bullets"], T, order, groups_, model)
+    why = cap(check_why(cache, out["bullets"], T, order, groups_, model), groups_)
     titles = {str(x["task"]): x["title"].strip() for x in out["titles"]}
     note = (None if why else f"No Why section: too few tasks for patterns (a statement needs at least {MIN_GROUP} "
             "tasks that share it)." if not groups_ else "No Why section: the check kept no statement on enough tasks.")

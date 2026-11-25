@@ -188,7 +188,11 @@ class Report(FakeClaude):
         vs_r = [x for x in g.values() if x["pair"] == (P, R)]
         self.assertEqual([(x["tag"], x["favor"]) for x in vs_r],
                          [("Recall", False), ("Main errors", False), ("Recall", True)])
-        self.assertTrue(all(len([x for x in g.values() if x["pair"][1] == o]) <= report.WHY_CAP for o in (R, B)))
+        # after the check: the largest leads that survived, the favor point kept, WHY_CAP at most
+        g = {"a": {"lead": 9}, "b": {"lead": 1}, "c": {"lead": 5}, "d": {"lead": 3}, "f": {"lead": 0}}
+        why = [{"gid": k, "pair": (P, R), "favor": k == "f"} for k in ("a", "b", "c", "d", "f")]
+        self.assertEqual([b["gid"] for b in report.cap(why, g)], ["a", "c", "d", "f"])
+        self.assertEqual([b["gid"] for b in report.cap([x for x in why if x["gid"] != "c"], g)], ["a", "b", "d", "f"])
 
     def test_failed_verdict_and_why_calls_fall_back(self):
         root = make_report_fixture(self.tmp / "fx3", n=5)
