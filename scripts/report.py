@@ -341,6 +341,8 @@ def coverage(n, cfg):
     want, kept = cfg.get("want"), cfg.get("kept")
     if not want:
         return None
+    if n >= want:
+        return None
     text = f"This report covers {n} of the {want} tasks planned"
     if kept is not None and kept < want:
         text += f"; the task builder kept {kept} (the others had an expired premise or no fair public question)"
@@ -516,6 +518,10 @@ def computed(T, order, n, link=str):
 # Why: one bullet per Providers-table column, framed as what you'd have experienced with another provider.
 # tag, then the frame against the other provider o and in o's favor ({W}: the pick, {O}: o).
 CATS = {
+    "call": ("Ranked best", "missed … (something concrete the judge preferred in {W}'s answer and {O}'s lacked, neither "
+                            "material nor errors; from the ranking reasons)",
+             "gained … (something concrete the judge preferred in {O}'s answer, neither material nor errors; from the "
+             "ranking reasons)"),
     "recall": ("Recall", "missed … (material {W}'s evidence held and {O}'s didn't; from the recall reasons)",
                "gained … (material {O}'s evidence held and {W}'s didn't; from the recall reasons)"),
     "main": ("Main errors", "been told … (the main point of {O}'s answer, which the evidence contradicts; from {O}'s "
@@ -524,10 +530,6 @@ CATS = {
     "side": ("Side errors", "been told … (a side point in {O}'s answer that the evidence contradicts; from {O}'s error "
                             "reasons)",
              "avoided … (a side point {W}'s answer got wrong; from {W}'s error reasons)"),
-    "call": ("Ranked best", "missed … (something concrete the judge preferred in {W}'s answer and {O}'s lacked, neither "
-                            "material nor errors; from the ranking reasons)",
-             "gained … (something concrete the judge preferred in {O}'s answer, neither material nor errors; from the "
-             "ranking reasons)"),
 }
 WHY_CAP = 4  # bullets per compared provider, the one in its favor included
 NEED = {"main": 1}  # tasks a bullet needs, where not MIN_GROUP: a main error is rare and serious, so one shows
@@ -558,7 +560,8 @@ def groups(T, agg, w, r):
         lead = sorted((c for c in CATS if len(up[c]) > len(down[c]) and len(up[c]) >= need(c)),
                       key=lambda c: len(down[c]) - len(up[c]))
         favor = max((c for c in CATS if len(down[c]) >= need(c)), key=lambda c: len(down[c]), default=None)
-        picks = [(c, False) for c in lead[:WHY_CAP - (favor is not None)]] + ([(favor, True)] if favor else [])
+        lead = sorted(lead[:WHY_CAP - (favor is not None)], key=list(CATS).index)  # biggest leads, in column order
+        picks = [(c, False) for c in lead] + ([(favor, True)] if favor else [])
         for c, fav in picks:
             ks = down[c] if fav else up[c]
             who, other = (Oth, W) if fav else (W, Oth)

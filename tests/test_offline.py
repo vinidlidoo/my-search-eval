@@ -459,7 +459,7 @@ class Report(FakeClaude):
                                     (root / "report.html").read_text(), re.S)[1])
         self.assertTrue(data["tasks"])
         page = (root / "report.html").read_text()
-        html_heads = re.findall(r"<p class='why-head'>With (.+?) instead, you&#x27;d have:</p><ul>", page)
+        html_heads = re.findall(r"<p class='why-head'><span class=\"dot[^\"]*\" aria-hidden=\"true\"></span>With (.+?) instead, you&#x27;d have:</p><ul>", page)
         self.assertEqual(html_heads, heads)  # every group: a heading, then its list
 
     def test_no_graded_task_raises(self):
