@@ -102,13 +102,16 @@ th.m,td.m{text-align:left;padding-left:18px}th.c,td.c{text-align:center;width:4.
 .defs{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:12px 24px;margin:8px 0 4px;
  font-size:.82rem;color:var(--muted);line-height:1.5}
 .defs b{display:block;color:var(--text);font-weight:600}
-.h2h{padding:6px 20px}
-.vs{display:grid;grid-template-columns:minmax(7.5rem,auto) 1fr minmax(7.5rem,auto);gap:16px;align-items:center;
- padding:14px 0;border-bottom:1px solid var(--line)}.vs:last-child{border-bottom:0}
-.vs .r{text-align:right}.vs b{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums}
-.vs .l b{margin-left:8px}.vs .r b{margin-right:8px}.vs .r .dot{margin:0 0 0 .5em}.vs .l,.vs .r{white-space:nowrap}
-.split{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:3px}
-.split .a{background:color-mix(in srgb,var(--a) 85%,var(--surface))}.split .b{background:color-mix(in srgb,var(--b) 85%,var(--surface))}
+.h2h{padding:4px 22px}
+.vs{padding:16px 0;border-bottom:1px solid var(--line)}.vs:last-child{border-bottom:0}
+.vs .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.vs .side{display:flex;align-items:baseline;gap:8px;min-width:0}.vs .side.r{flex-direction:row-reverse;text-align:right}
+.vs .dot{margin:0;align-self:center}@media (max-width:480px){.vs .pc{display:none}}
+.vs .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs .ct{font-size:1.25rem;font-weight:750;font-variant-numeric:tabular-nums;line-height:1}
+.vs .pc{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+.split{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:3px}
+.split .a{background:var(--a)}.split .b{background:var(--b)}
 .note{color:var(--muted);font-size:.88rem;margin:12px 2px 0}
 .why-g{padding:18px 22px 6px}.why-g+.why-g{margin-top:16px}
 .why .why-head{display:flex;align-items:center;font-size:1.08rem;font-weight:700;margin:0;padding-bottom:10px}
@@ -116,8 +119,8 @@ th.m,td.m{text-align:left;padding-left:18px}th.c,td.c{text-align:center;width:4.
 .why ul{list-style:none;padding:0;margin:0}
 .why li{display:grid;grid-template-columns:7.5rem 1fr;gap:4px 16px;align-items:baseline;padding:14px 0;margin:0;
  border-top:1px solid var(--line)}
-.why .favor-head{display:inline-block;font-size:.8rem;font-weight:650;margin:14px 0 8px;padding:2px 10px;border-radius:999px;background:color-mix(in srgb,var(--e2) 14%,var(--surface));color:light-dark(#0b6357,var(--e2))}
-.why .favor-head+ul li{border-top:1px dashed var(--line)}
+.why .favor-head{font-size:.85rem;font-weight:600;color:var(--muted);margin:0;padding:18px 0 4px;border-top:1px solid var(--line)}
+.why .favor-head+ul li:first-child{border-top:0}
 .why details.also{display:inline}.why details.also summary{display:inline;cursor:pointer;color:var(--muted);font-size:.82rem;
  list-style:none;margin-left:6px;white-space:nowrap;border:1px solid var(--line-strong);border-radius:999px;padding:0 8px;font-weight:600}.why details.also summary::-webkit-details-marker{display:none}
 .why details.also summary::before{content:none}.why details.also[open] summary{color:var(--text)}
@@ -144,7 +147,7 @@ button{font-weight:600;padding:0 14px;cursor:pointer}
 button:hover:not(:disabled){background:var(--inset)}
 button:disabled{color:var(--muted);background:var(--inset);cursor:default;border-color:var(--line-strong)}
 select{height:34px;font:inherit;font-size:.92rem;border-radius:8px;border:1px solid var(--field);background:var(--surface);color:var(--text);padding:0 8px;max-width:min(40rem,100%);min-width:0;text-overflow:ellipsis}
-.nav label.pick{flex:1;min-width:0;margin-left:0}.nav label.pick select{width:100%}
+.nav label.pick{position:relative;flex:0 1 auto;min-width:0;margin-left:0}.nav label.pick select{appearance:none;-webkit-appearance:none;width:100%;padding:0 34px 0 12px;font-weight:500;cursor:pointer}.nav label.pick::after{content:"";position:absolute;right:14px;top:50%;width:7px;height:7px;pointer-events:none;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
 #task{padding:24px 20px 20px}
 #task h3:focus{outline:none}#task h3:focus-visible{outline:2px solid var(--accent)}
 .tn{display:block;font-size:.85rem;color:var(--muted);font-weight:600;
@@ -186,6 +189,7 @@ details[open]{padding-bottom:12px}
 .pv ol.calls{padding-left:22px;margin:0}.pv ol.calls>li{margin:0 0 16px}
 .pv ol.hits{margin:8px 0;padding-left:28px}.pv ol.hits li{margin:3px 0;overflow-wrap:anywhere}
 .pv .cited{color:var(--good,#2f9e44);font-weight:650;font-size:.82rem;margin-left:4px}
+#task .pv details.calls{border-top:0;margin:0}#task .pv details.calls>summary{padding:6px 0;font-size:.92rem}
 #task .pv details.raw{margin-top:4px;border-top:0}#task .pv details.raw>summary{padding:4px 0;font-weight:500;font-size:.85rem;color:var(--muted)}
 .pv .meta{color:var(--muted);font-size:.85rem}.pv .flag{color:var(--bad);font-weight:650;font-size:.8rem;
  text-transform:uppercase;letter-spacing:.04em;margin-left:6px}
@@ -204,7 +208,7 @@ ul,ol{padding-left:22px}li{margin:5px 0}
 @media (max-width:700px){.diagram{display:none}.hint{display:none}}
 @media (max-width:600px){
  main{padding:32px 16px 64px}h2{margin-top:44px}.verdict{padding:20px}.verdict .lead{font-size:1.5rem}
- .h2h{padding:4px 16px}.vs{grid-template-columns:1fr 1fr;gap:8px 12px}.vs .split{grid-column:1/-1;grid-row:2}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
+ .h2h{padding:4px 16px}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
 @media (pointer:coarse){.also a.tlink{display:inline-block;min-height:24px;padding:2px 3px}}
 @media (prefers-reduced-motion:no-preference){
  #task.swap{animation:fade .18s ease-out}
@@ -265,7 +269,7 @@ const pvBody = p => {
       `<pre>${esc(c.preview)}${c.cut ? '\\n…' : ''}</pre></details>` : '') + '</li>').join('');
   return `<div class="body prose"><p><b>Recall:</b> ${linkify(p.recall)}</p><p><b>Errors:</b> ${linkify(p.error)}</p>` +
     `<div><span class="label">Answer</span><pre>${esc(p.answer)}</pre></div>` +
-    `<div><span class="label">Tool calls (${p.calls.length})</span>${calls ? '<ol class="calls">' + calls + '</ol>' : '<p class="meta">None.</p>'}</div></div>`;
+    (calls ? `<details class="calls"><summary>Tool calls (${p.calls.length})</summary><ol class="calls">${calls}</ol></details>` : '<p class="meta">No tool calls.</p>') + '</div>';
 };
 const chip = (s, sev) => `<span class="chip ${sev}">${esc(s)}</span>`;
 let fitting = 0;
@@ -455,11 +459,14 @@ def head_to_head(above, idx):
     out = []
     for a, b, x, n in above:
         ca, cb = (f"var(--e{idx[y]})" for y in (a, b))
+        y = n - x
+        pa, pb = (f"{round(100 * v / n)}%" if n else "" for v in (x, y))
         out.append(f'<div class="vs" role="img" aria-label="{e(a)} ranked above {e(b)} on {x:g} of {n} tasks; '
-                   f'{e(b)} above {e(a)} on {n - x:g}"><span class="l">{dot(idx[a])}{e(a)}<b>{x:g}</b></span>'
+                   f'{e(b)} above {e(a)} on {y:g}"><div class="top" aria-hidden="true">'
+                   f'<span class="side">{dot(idx[a])}<span class="nm">{e(a)}</span><span class="ct">{x:g}</span><span class="pc">{pa}</span></span>'
+                   f'<span class="side r">{dot(idx[b])}<span class="nm">{e(b)}</span><span class="ct">{y:g}</span><span class="pc">{pb}</span></span></div>'
                    f'<span class="split" style="--a:{ca};--b:{cb}" aria-hidden="true">'
-                   f'<span class="a" style="flex:{x:g}"></span><span class="b" style="flex:{n - x:g}"></span></span>'
-                   f'<span class="r"><b>{n - x:g}</b>{e(b)}{dot(idx[b])}</span></div>')
+                   f'<span class="a" style="flex:{x:g}"></span><span class="b" style="flex:{y:g}"></span></span></div>')
     return f'<div class="card h2h">{"".join(out)}</div>'
 
 
@@ -494,7 +501,7 @@ def why_html(why, idx):
         out.append("<div class='card why-g'>"
                    + (f"<p class='why-head'>{dot(idx[g['provider']])}{inline(g['head'])}</p>" if g["head"] else "")
                    + (f"<ul>{''.join(map(li, against))}</ul>" if against else "")
-                   + (f"<p class='favor-head'>+ In {e(g['provider'])}'s favor</p><ul>{''.join(map(li, favor))}</ul>"
+                   + (f"<p class='favor-head'>In {e(g['provider'])}'s favor</p><ul>{''.join(map(li, favor))}</ul>"
                       if favor else "") + "</div>")
     return "".join(out)
 
