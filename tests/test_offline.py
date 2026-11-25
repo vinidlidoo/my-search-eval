@@ -187,7 +187,7 @@ class Report(FakeClaude):
         g = report.groups(T, {}, P, R)
         vs_r = [x for x in g.values() if x["pair"] == (P, R)]
         self.assertEqual([(x["tag"], x["favor"]) for x in vs_r],
-                         [("Recall", False), ("Main errors", False), ("Recall", True)])
+                         [("Recall", False), ("Main errors", False), ("Side errors", True)])  # favor: never a led column
         # after the check: the largest leads that survived, the favor point kept, WHY_CAP at most
         g = {"a": {"lead": 9}, "b": {"lead": 1}, "c": {"lead": 5}, "d": {"lead": 3}, "f": {"lead": 0}}
         why = [{"gid": k, "pair": (P, R), "favor": k == "f"} for k in ("a", "b", "c", "d", "f")]

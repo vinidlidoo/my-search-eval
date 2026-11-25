@@ -259,6 +259,8 @@ def secure(home):
 
 
 SETUP_CHECKED = "2026-11-18"  # when each provider's MCP setup was last checked against its docs
+MIN_TASKS = 10  # tasks a run needs, checked before it starts and after the build
+RATE_STOP = 2  # replays a provider's rate limit refused, across the run, that stop replaying
 RETENTION_DAYS = 60  # run folders and cache entries older than this are deleted (the latest run is always kept)
 
 

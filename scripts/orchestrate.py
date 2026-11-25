@@ -50,15 +50,14 @@ import harvest  # noqa: E402
 import instructions  # noqa: E402
 import report  # noqa: E402
 import runner  # noqa: E402
-from common import (PROVIDER_INFO, PROVIDERS, RETENTION_DAYS, AuthError, secure, UsageLimit, default_home, default_model, dev,  # noqa: E402
+from common import (MIN_TASKS, PROVIDER_INFO, PROVIDERS, RATE_STOP, RETENTION_DAYS, AuthError, secure, UsageLimit, default_home, default_model, dev,  # noqa: E402
                     preflight_auth, read_jsonl, write_json, write_text)
 
-FULL, QUICK, MIN_TASKS = 30, 10, 10
+FULL, QUICK = 30, 10
 WORKERS = 3
 KEEP_RUNS = 3
 KEEP_FILES = {"report.html", "report.md", "terminal.txt", "method.svg", "results.jsonl.gz", "diagnostics.md",
               "config.json", "progress.json"}  # what log pruning and --purge keep: the reports, and what dates the run
-RATE_STOP = 2  # refusals from one provider's rate limit, across the run, that stop replaying
 PHASES = ["instructions", "build", "replay", "judge", "report"]
 # Wall time on Opus, fit to two runs (10 tasks: 14 min; 30 tasks: 25 min): fixed minutes + minutes per task.
 MIN_FIXED, MIN_PER_TASK = 8.0, 0.57
@@ -244,6 +243,8 @@ def replay(run_dir, home, tasks, model, instr, prog):
         log = d / f"{e}.jsonl"
         st = None
         for attempt in range(1, attempts + 1):
+            if attempt > 1 and stop.is_set():
+                return
             try:
                 runner.run(e, t["task"], instr.get(e), d, model)
             except Exception as exc:
@@ -251,9 +252,9 @@ def replay(run_dir, home, tasks, model, instr, prog):
             st = runner.status(log, e)
             if st["usage_limit"]:
                 return halt(("usage", st["error"]))
-            if st["rate_limited"]:  # one refusal reruns the task; RATE_STOP across the run stops replaying
+            if st["rate_limited"]:  # a refused replay is rerun once; RATE_STOP refused replays stop replaying
                 with lock:
-                    n = state["refused"][e] = state["refused"].get(e, 0) + st["rate_limited"]
+                    n = state["refused"][e] = state["refused"].get(e, 0) + 1
                 if n >= RATE_STOP:
                     return halt(("rate", e, t["n"]))
             if runner.done(log, e):

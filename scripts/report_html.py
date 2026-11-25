@@ -208,14 +208,9 @@ details[open]{padding-bottom:12px}
 .sections p,.sections ul,.sections ol{max-width:72ch}
 ul,ol{padding-left:22px}li{margin:5px 0}
 .diagram{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0}
-.diagram svg{display:block;max-width:100%;height:auto}
-.steps{list-style:none;padding:0;counter-reset:s}
-.steps li{counter-increment:s;display:flex;gap:12px;align-items:baseline;padding:6px 0}
-.steps li::before{content:counter(s);flex:none;display:inline-grid;place-items:center;width:1.6em;height:1.6em;
- border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.8rem}
+.diagram svg{display:block;max-width:100%;height:auto}.diagram .tall{display:none}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-@media (min-width:701px){.steps{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
-@media (max-width:700px){.diagram{display:none}.hint{display:none}}
+@media (max-width:700px){.diagram .wide{display:none}.diagram .tall{display:block;margin:0 auto}.hint{display:none}}
 @media (max-width:600px){
  main{padding:32px 16px 64px}h2{margin-top:44px}.verdict{padding:20px}.verdict .lead{font-size:1.5rem}
  .kpis{grid-template-columns:1fr 1fr;gap:16px 0}.kpi:nth-child(odd){padding-left:0;border-left:0}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
@@ -403,8 +398,8 @@ def inline(s):
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
 
 
-def md_block(lines, svg=""):
-    """Render the methodology-style Markdown: paragraphs, bullets, numbered lists, the diagram."""
+def md_block(lines, svgs=()):
+    """Render the methodology-style Markdown: paragraphs, bullets, numbered lists, the diagram (svgs: wide, tall)."""
     out, lst = [], None
     for ln in lines:
         m = re.match(r"^\s*(?:- |\d+\. )(.*)", ln)
@@ -420,9 +415,10 @@ def md_block(lines, svg=""):
         elif ln.startswith("## "):
             continue  # the <details> summary carries the section title
         elif ln.startswith("!["):
-            if svg:  # the list is the text equivalent: visible on phones, visually hidden next to the diagram
-                out.append(f'<div class="diagram" aria-hidden="true">{svg}</div>'
-                           '<ol class="steps" aria-label="How the eval works">'
+            if svgs:  # wide above 700px, stacked on phones; the visually hidden list is the text equivalent
+                wide, tall = (x.replace("<svg ", f'<svg class="{c}" ', 1) for c, x in zip(("wide", "tall"), svgs))
+                out.append(f'<div class="diagram" aria-hidden="true">{wide}{tall}</div>'
+                           '<ol class="sr" aria-label="How the eval works">'
                            + "".join(f"<li>{e(x)}</li>" for x in DIAGRAM_STEPS) + "</ol>")
         elif ln.strip():
             out.append(f"<p>{inline(ln)}</p>")

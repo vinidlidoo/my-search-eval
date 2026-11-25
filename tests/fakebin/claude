@@ -171,7 +171,7 @@ elif "titles" in props:  # why
 elif "bullets" in props:  # check or rewrite
     items = props["bullets"]["items"]["properties"]
     res = []
-    for m in re.finditer(r"^# Bullet (\d+)\n(.*?)(?=^# Bullet |\Z)", prompt, re.S | re.M):
+    for m in re.finditer(r"^# Bullet (\d+)[^\n]*\n(.*?)(?=^# Bullet |\Z)", prompt, re.S | re.M):
         ks = [int(k) for k in re.findall(r"^## Task (\d+)", m[2], re.M)]
         res.append({"bullet": int(m[1]), "holds": ks} if "holds" in items else
                    {"bullet": int(m[1]), "text": m[2].split("\n")[0], "tasks": ks})
