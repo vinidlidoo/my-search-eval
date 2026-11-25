@@ -157,12 +157,38 @@ class Report(FakeClaude):
         self.assertEqual(len(self.calls()), n)
 
     def test_report_two_tasks(self):
-        """Too few tasks for any Why group: the report still renders, with no Why."""
+        """Too few tasks for a pattern: the report still renders, and its Why holds at most main errors (one task
+        is enough for one)."""
         root = make_report_fixture(self.tmp / "fx2", n=2)
         quiet(self.render, root)
-        self.assertIn("Verdict", (root / "terminal.txt").read_text())
-        self.assertNotIn('id="h-why"', (root / "report.html").read_text())
-        self.assertIn("No Why section: too few tasks for patterns", (root / "terminal.txt").read_text())
+        term = (root / "terminal.txt").read_text()
+        self.assertIn("Verdict", term)
+        if "\nWhy\n" in term:
+            self.assertEqual(set(re.findall(r"\[([^\]]+)\]", term.split("\nWhy\n", 1)[1])), {"Main errors"})
+        else:
+            self.assertIn("No Why section: too few tasks for patterns", term)
+
+    def test_why_groups_follow_the_providers_columns(self):
+        """Biggest leads first, an even column left out, the point in the other provider's favor last, 4 at most."""
+        def e(rank, recall, err=""):
+            return {"rank": rank, "recall": recall, "main": float(err == "main"), "side": float(err == "side"),
+                    "sev": {"": 0, "side": 1, "main": 2}[err]}
+        P, R, B = report.PROVIDERS[0], report.PROVIDERS[1], report.PROVIDERS[2]
+        T = {}
+        for k in range(1, 6):  # P has more recall: lead 5
+            T[str(k)] = {"e": {P: e(1, 4), R: e(2, 3), B: e(3, 1)}}
+        for k in range(6, 9):  # side errors: 3 each way, even
+            T[str(k)] = {"e": {P: e(1, 3), R: e(2, 3, "side"), B: e(3, 1)}}
+        for k in range(9, 12):
+            T[str(k)] = {"e": {P: e(2, 3, "side"), R: e(1, 3), B: e(3, 1)}}
+        T["12"] = {"e": {P: e(1, 3), R: e(2, 3, "main"), B: e(3, 1)}}  # one main error: enough on its own
+        for k in range(13, 16):  # R has more recall on 3: the point in its favor
+            T[str(k)] = {"e": {P: e(2, 2), R: e(1, 4), B: e(3, 1)}}
+        g = report.groups(T, {}, P, R)
+        vs_r = [x for x in g.values() if x["pair"] == (P, R)]
+        self.assertEqual([(x["tag"], x["favor"]) for x in vs_r],
+                         [("Recall", False), ("Main errors", False), ("Recall", True)])
+        self.assertTrue(all(len([x for x in g.values() if x["pair"][1] == o]) <= report.WHY_CAP for o in (R, B)))
 
     def test_failed_verdict_and_why_calls_fall_back(self):
         root = make_report_fixture(self.tmp / "fx3", n=5)

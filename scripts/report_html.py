@@ -86,13 +86,12 @@ th.m,td.m{text-align:left;padding-left:18px}th.c,td.c{text-align:center;width:4.
 .defs{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:12px 24px;margin:8px 0 4px;
  font-size:.82rem;color:var(--muted);line-height:1.5}
 .defs b{display:block;color:var(--text);font-weight:600}
-.h2h{padding:6px 20px}
-.pair{display:grid;grid-template-columns:minmax(11rem,15rem) 1fr 3.5rem;gap:16px;align-items:center;padding:13px 0;
- border-bottom:1px solid var(--line)}.pair:last-child{border-bottom:0}
+.h2h{display:flex;flex-wrap:wrap;gap:12px 36px;padding:16px 20px}
+.pair{display:flex;align-items:center;gap:8px;white-space:nowrap}.pair .bar{width:84px;flex:0 1 84px;min-width:40px}
+.pair .dot{margin:0}.pair b{font-weight:650}
 .bar{position:relative;height:10px;border-radius:5px;
  background:linear-gradient(90deg,var(--a) calc(var(--v)*100%),var(--surface) 0 calc(var(--v)*100% + 2px),var(--b) 0)}
 .bar::after{content:"";position:absolute;left:calc(50% - 1px);top:0;bottom:0;width:2px;background:var(--surface)}
-.pair .v{text-align:right;font-weight:650}
 .note{color:var(--muted);font-size:.88rem;margin:12px 2px 0}
 .why .why-head{font-weight:650;margin:0 0 4px}
 .why ul{list-style:none;padding:0;margin:0}
@@ -101,6 +100,8 @@ th.m,td.m{text-align:left;padding-left:18px}th.c,td.c{text-align:center;width:4.
 .why li>.dot{transform:translateY(-.05em)}.why ul+ul{margin-top:28px}
 .dot.ring{background:none;box-shadow:inset 0 0 0 2px var(--c)}
 .also{color:var(--muted)}
+.tag{display:inline-block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;font-weight:650;color:var(--muted);
+ border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-right:4px;vertical-align:.12em;white-space:nowrap}
 a.tlink{text-decoration-color:color-mix(in srgb,var(--accent) 40%,transparent);font-variant-numeric:tabular-nums}
 .ex{white-space:nowrap}.ex a.tlink{display:inline-block;padding:0 2px;margin:0;border-radius:4px;background:var(--accent-soft);text-decoration:none;
  font-size:.9em;font-weight:600;line-height:1.6}
@@ -178,8 +179,7 @@ ul,ol{padding-left:22px}li{margin:5px 0}
 @media (max-width:700px){.diagram{display:none}.hint{display:none}}
 @media (max-width:600px){
  main{padding:32px 16px 64px}h2{margin-top:44px}.verdict{padding:20px}.verdict .lead{font-size:1.5rem}
- .pair{grid-template-columns:1fr 3rem;gap:8px 12px}.pair .bar{grid-row:2;grid-column:1/-1}.pair .v{grid-row:1;grid-column:2}
- .h2h{padding:4px 16px}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
+ .h2h{padding:14px 16px}.tw{padding:0 16px}#task{padding:20px 16px}.nav{padding:10px 12px}.nav label{margin-left:0}}
 @media (pointer:coarse){.also a.tlink{display:inline-block;min-height:24px;padding:2px 3px}}
 @media (prefers-reduced-motion:no-preference){
  #task.swap{animation:fade .18s ease-out}
@@ -197,7 +197,13 @@ ul,ol{padding-left:22px}li{margin:5px 0}
 @container eng (width < 50rem){
  table.eng{font-size:.84rem}.eng thead th{font-size:.64rem}.eng th,.eng td{padding:10px 5px}
  .eng th.m,.eng td.m{padding-left:10px}.eng .meter{grid-template-columns:2.8rem 2.6rem;gap:5px}}
-""" + STACK.format(name="eng", width="39.5rem") + STACK.format(name="task", width="40rem")
+.eng-t{display:none;width:100%;table-layout:fixed;font-size:.84rem}
+.eng-t th,.eng-t td{padding:9px 3px;text-align:right;white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.eng-t tbody th{width:32%;text-align:left;font-size:.66rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.eng-t thead th{text-transform:none;letter-spacing:0;font-size:.8rem;color:var(--text);font-weight:650;line-height:1.3}
+.eng-t thead td{width:32%}.eng-t .dot{margin-right:.25em}
+@container eng (width < 39.5rem){table.eng{display:none}.eng-t{display:table}}
+""" + STACK.format(name="task", width="40rem")
 
 JS = """
 const D = document.getElementById('data');
@@ -405,8 +411,13 @@ def providers_table(head, rows, idx, defs):
                  + "".join(f'<td role="cell"{m[k]} data-label="{e(h)}">{meter(c, f"e{i}")}</td>'
                            for k, (h, c) in enumerate(zip(head[1:], r["cells"]), 1))
                  + "</tr>")
+    flip = ("<table class='eng-t'><thead><tr><td></td>"
+            + "".join(f"<th scope='col'>{dot(idx[r['provider']])}{e(r['provider'])}</th>" for r in rows) + "</tr></thead><tbody>"
+            + "".join(f"<tr><th scope='row'>{e(h)}</th>" + "".join(f"<td class='num'>{e(r['cells'][k]['text'])}</td>" for r in rows)
+                      + "</tr>" for k, h in enumerate(head[1:]))
+            + "</tbody></table>")
     return (f'<div class="card"><div class="tw eng"><table class="eng" role="table"><thead role="rowgroup">'
-            f'<tr role="row">{ths}</tr></thead><tbody role="rowgroup">{body}</tbody></table></div></div>')
+            f'<tr role="row">{ths}</tr></thead><tbody role="rowgroup">{body}</tbody></table>{flip}</div></div>')
 
 
 def legend_html(defs):
@@ -415,13 +426,14 @@ def legend_html(defs):
 
 
 def head_to_head(above, idx):
+    """One line per pair: "● Exa 18 ━━━━ 12 Parallel ●", the bar split at the share of tasks each was ranked above."""
     out = []
     for a, b, x, n in above:
         ca, cb = (f"var(--e{idx[y]})" for y in (a, b))
-        label, v = f"{a} above {b}", f"{x:g}/{n}"
-        out.append(f'<div class="pair"><span>{dot(idx[a])}{e(label)}</span>'
+        out.append(f'<div class="pair" aria-label="{e(a)} ranked above {e(b)} on {x:g} of {n} tasks">'
+                   f'{dot(idx[a])}<span>{e(a)}</span><b class="num">{x:g}</b>'
                    f'<span class="bar" style="--v:{x / n if n else 0:.3f};--a:{ca};--b:{cb}" aria-hidden="true"></span>'
-                   f'<span class="v num">{e(v)}</span></div>')
+                   f'<b class="num">{n - x:g}</b><span>{e(b)}</span>{dot(idx[b])}</div>')
     return f'<div class="card h2h">{"".join(out)}</div>'
 
 
@@ -440,7 +452,8 @@ def why_html(why, idx):
         for x in g["items"]:
             also = (" <span class='also'>(also " + ("tasks " if len(x["also"]) > 1 else "task ")
                     + ", ".join(tlink(k) for k in x["also"]) + ")</span>") if x["also"] else ""
-            items.append(f"<li>{dot(idx[g['provider']], x['favor'])}<span>{inline(x['text'])}{also}</span></li>")
+            tag = f"<span class='tag'>{e(x['tag'])}</span> " if x.get("tag") else ""
+            items.append(f"<li>{dot(idx[g['provider']], x['favor'])}<span>{tag}{inline(x['text'])}{also}</span></li>")
         out.append((f"<p class='why-head'>{inline(g['head'])}</p>" if g["head"] else "")
                    + (f"<ul>{''.join(items)}</ul>" if items else ""))
     return "".join(out)

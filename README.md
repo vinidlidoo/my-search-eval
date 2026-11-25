@@ -19,7 +19,7 @@ Verdict
   results held the most of what your answers needed (recall 3.1 of 4). Parallel is the
   runner-up. Both are free at your volume.
 
-  per task        ranked best  recall  wrong (main / side)    monthly cost  context tokens  time
+  per task        ranked best  recall errors (main / side)    monthly cost  context tokens  time
   Exa                   14/30   3.1/4             3% / 10%  $0 (free tier)            ~38k  71 s
   Parallel              11/30   2.9/4             3% / 13%  $0 (free tier)            ~29k  64 s
   built-in search        5/30   2.2/4            10% / 17%              $0             ~9k  88 s
@@ -31,8 +31,8 @@ Head to head
 
 Why
   With Parallel instead, you'd have:
-  - missed the vendor's current pricing page, such as the per-seat price change (task 7)
-  - been told a deprecated flag still works (task 19)
+  - [Recall] missed the vendor's current pricing page, such as the per-seat price change (task 7)
+  - [Side errors] been told a deprecated flag still works (task 19)
 ```
 
 `report.html` (opened when the run ends) has every task, the judge's notes and the method, and for each provider its full answer and every tool call: the input, the pages it returned (rank, title, date, and whether the answer cited it), the start of the raw result (2,000 characters), and any error, rate limit or empty result. `results.jsonl.gz` next to it holds the same with each result's text up to 100,000 characters, the tools each provider offered, and request ids ([schema](docs/results-schema.md)), for anyone who wants to dig in, such as a provider's engineers if you choose to share it (see [Your data](#your-data) first).

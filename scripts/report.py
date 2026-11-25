@@ -61,7 +61,7 @@ def obj(props):
 
 SEV = {"none": 0, "limited": 1, "critical": 2}
 WHY_SCHEMA = obj({
-    "bullets": {"type": "array", "maxItems": 5, "items": obj({"group": {"type": "string"}, "text": {"type": "string"},
+    "bullets": {"type": "array", "items": obj({"group": {"type": "string"}, "text": {"type": "string"},
                                                                "tasks": INTS})},
     "titles": {"type": "array", "items": obj({"task": {"type": "integer"}, "title": {"type": "string"}})}})
 MIN_GROUP = 3  # tasks a Why statement needs, in its set and after the check
@@ -385,7 +385,7 @@ def verdict_input(T, agg, pairs, order, vol, keyless=(), stats=None):
         if b and e != BASELINE:
             cost += (f"; at the person's volume ${b['list_usd']:.2f} a month at list price, free credit "
                      f"${b['free_monthly_usd']:.0f} a month, so ${b['after_free_usd']:.2f} a month after the free tier")
-        out.append(f"- {LONG[e]}: ranked best on {count(x['best'])} of {n}; recall {x['recall']:.1f} of 4; wrong on the "
+        out.append(f"- {LONG[e]}: ranked best on {count(x['best'])} of {n}; recall {x['recall']:.1f} of 4; an error on the "
                    f"main point {100 * x['main']:.0f}%, on a side point only {100 * x['side']:.0f}%; {cost}; "
                    f"{fmt_k(x['tokens'])} context tokens; {x['secs']:.0f} s.")
     lim = keyless_limits(T, agg, vol, keyless)
@@ -513,34 +513,64 @@ def computed(T, order, n, link=str):
     return lines
 
 
+# Why: one bullet per Providers-table column, framed as what you'd have experienced with another provider.
+# tag, then the frame against the other provider o and in o's favor ({W}: the pick, {O}: o).
+CATS = {
+    "recall": ("Recall", "missed … (material {W}'s evidence held and {O}'s didn't; from the recall reasons)",
+               "gained … (material {O}'s evidence held and {W}'s didn't; from the recall reasons)"),
+    "main": ("Main errors", "been told … (the main point of {O}'s answer, which the evidence contradicts; from {O}'s "
+                            "error reasons)",
+             "avoided … (the main point {W}'s answer got wrong; from {W}'s error reasons)"),
+    "side": ("Side errors", "been told … (a side point in {O}'s answer that the evidence contradicts; from {O}'s error "
+                            "reasons)",
+             "avoided … (a side point {W}'s answer got wrong; from {W}'s error reasons)"),
+    "call": ("Ranked best", "missed … (something concrete the judge preferred in {W}'s answer and {O}'s lacked, neither "
+                            "material nor errors; from the ranking reasons)",
+             "gained … (something concrete the judge preferred in {O}'s answer, neither material nor errors; from the "
+             "ranking reasons)"),
+}
+WHY_CAP = 4  # bullets per compared provider, the one in its favor included
+NEED = {"main": 1}  # tasks a bullet needs, where not MIN_GROUP: a main error is rare and serious, so one shows
+
+
+def need(cat):
+    return NEED.get(cat, MIN_GROUP)
+
+
+def gaps(T, a, b):
+    """Tasks where a did better than b, per Providers-table column: more recall, an error on the main point only b
+    made, a side error only b made (same main-point grade), and a ranking above b on the judge's call alone."""
+    g = lambda f: [k for k, t in T.items() if f(t["e"][a], t["e"][b])]  # noqa: E731
+    return {"recall": g(lambda x, y: x["recall"] > y["recall"]),
+            "main": g(lambda x, y: y["main"] > x["main"]),
+            "side": g(lambda x, y: y["main"] == x["main"] and y["side"] > x["side"]),
+            "call": split(T, a, b)["call"]}
+
+
 def groups(T, agg, w, r):
-    """Fixed task sets the writer explains, framed as what the person would have experienced without the pick w.
-    Against the runner-up r: material missed (w ranked above with more recall), wrong information (w ranked above
-    and r had the worse error), other reasons (w ranked above, judge's call), and, for fairness, what r gave that w
-    didn't (r ranked above). Against the remaining provider: what you'd have missed or been told wrong."""
-    rest = [r] + [e for e in PROVIDERS if e not in (w, r)]
-    above = lambda a, b: [k for k, t in T.items() if t["e"][a]["rank"] < t["e"][b]["rank"]]  # noqa: E731
-    sp = split(T, w, r)
-    W, R = NAME[w], NAME[r]
-    out = {
-        "missed": (f"the {len(sp['recall'])} tasks where {W} was ranked above {R} with more recall", sp["recall"],
-                   f"With {R} instead, you'd have: missed … (material {W}'s evidence held and {R}'s didn't)", (w, r)),
-        "wrong": None,
-        "other": (f"the {len(sp['call'])} tasks where {W} was ranked above {R} on the judge's call", sp["call"],
-                  f"With {R} instead, you'd have: missed … (something concrete the judge preferred in {W}'s answer and "
-                  f"{R}'s lacked, neither material nor errors)",
-                  (w, r)),
-        "gave": (f"the {len(above(r, w))} tasks where {R} was ranked above {W}", above(r, w),
-                 f"With {R} instead, though, you'd have: gained … (what {R} gave that {W} didn't)", (w, r)),
-    }
-    wrong = [k for k in above(w, r) if T[k]["e"][r]["sev"] > T[k]["e"][w]["sev"]]
-    out["wrong"] = (f"the {len(wrong)} tasks where {W} was ranked above {R} and {R}'s answer had the worse error", wrong,
-                    f"With {R} instead, you'd have: been told … (wrong information in {R}'s answer)", (w, r))
-    for o in rest[1:]:
-        ks = above(w, o)
-        out[f"vs-{o}"] = (f"the {len(ks)} tasks where {W} was ranked above {NAME[o]}", ks,
-                          f"With {NAME[o]} instead, you'd have: … (what you'd have missed or been told wrong)", (w, o))
-    return {g: v for g, v in out.items() if len(v[1]) >= MIN_GROUP}
+    """Fixed task sets the writer explains, per provider o compared with the pick w (the runner-up r first): the
+    columns where w's lead in tasks is largest, then the one column with the most tasks in o's favor, WHY_CAP in all.
+    {gid: {"label", "ks", "frame", "pair", "tag", "cat", "favor"}}, in display order."""
+    out = {}
+    for o in [r] + [e for e in PROVIDERS if e not in (w, r)]:
+        up, down = gaps(T, w, o), gaps(T, o, w)
+        W, Oth = NAME[w], NAME[o]
+        lead = sorted((c for c in CATS if len(up[c]) > len(down[c]) and len(up[c]) >= need(c)),
+                      key=lambda c: len(down[c]) - len(up[c]))
+        favor = max((c for c in CATS if len(down[c]) >= need(c)), key=lambda c: len(down[c]), default=None)
+        picks = [(c, False) for c in lead[:WHY_CAP - (favor is not None)]] + ([(favor, True)] if favor else [])
+        for c, fav in picks:
+            ks = down[c] if fav else up[c]
+            who, other = (Oth, W) if fav else (W, Oth)
+            what = {"recall": f"{who} had more recall than {other}", "main": f"only {other} erred on the main point",
+                    "side": f"only {other} erred on a side point", "call": f"{who} was ranked above {other} on the "
+                                                                          "judge's call"}[c]
+            frame = (f"With {Oth} instead, though, you'd have: " if fav else f"With {Oth} instead, you'd have: ") + \
+                CATS[c][2 if fav else 1].format(W=W, O=Oth)
+            out[f"{o}-{c}{'-favor' if fav else ''}"] = {"label": f"the {len(ks)} tasks where {what}", "ks": ks,
+                                                         "frame": frame, "pair": (w, o), "tag": CATS[c][0], "cat": c,
+                                                         "favor": fav}
+    return out
 
 
 def provider_notes(t, providers):
@@ -563,7 +593,7 @@ def check_why(cache, bullets, T, order, groups_, model):
        claim holds on more than half the group."""
     bullets = [{"group": b["group"], "text": b["text"].strip(),
                 "tasks": sorted(({str(k) for k in b["tasks"]} | set(EXAMPLE.findall(b["text"])))
-                                & set(groups_[b["group"]][1]), key=int), "pair": groups_[b["group"]][3]}
+                                & set(groups_[b["group"]]["ks"]), key=int), "pair": groups_[b["group"]]["pair"]}
                for b in bullets if b["group"] in groups_]
     check_sys = (PROMPTS / "verify-why.md").read_text()
 
@@ -584,12 +614,12 @@ def check_why(cache, bullets, T, order, groups_, model):
         holds = {r["bullet"]: {str(k) for k in r["holds"]} for r in res}
         return {i: [k for k in ks if k in holds.get(i, set())] for i, (_, ks) in items.items()}
 
-    def ok(text, ks):
-        return len(ks) >= MIN_GROUP and set(EXAMPLE.findall(text)) <= set(ks)
+    def ok(i, text, ks):
+        return len(ks) >= need(groups_[bullets[i]["group"]]["cat"]) and set(EXAMPLE.findall(text)) <= set(ks)
 
     kept = check({i: (b["text"], b["tasks"]) for i, b in enumerate(bullets)})
-    redo = {i: kept[i] if len(kept[i]) >= MIN_GROUP else groups_[b["group"]][1]
-            for i, b in enumerate(bullets) if not ok(b["text"], kept[i])}
+    redo = {i: kept[i] if len(kept[i]) >= need(groups_[b["group"]]["cat"]) else groups_[b["group"]]["ks"]
+            for i, b in enumerate(bullets) if not ok(i, b["text"], kept[i])}
     if redo:
         system = ((PROMPTS / "report.md").read_text() + "\n\n## Now\n\nRewrite each bullet below. Keep its subject, and word "
                   "the claim at the level the judge's notes support on at least 3 of the tasks shown with it, citing "
@@ -600,20 +630,23 @@ def check_why(cache, bullets, T, order, groups_, model):
                for r in res if r["bullet"] in redo}
         rechecked = check(new) if new else {}
         for i in redo:
-            if i in new and ok(new[i][0], rechecked[i]):
+            if i in new and ok(i, new[i][0], rechecked[i]):
                 bullets[i]["text"], kept[i] = new[i][0], rechecked[i]
             else:
                 del kept[i]
     out = []
-    for i, ks in sorted(kept.items()):
-        label, pop = groups_[bullets[i]["group"]][:2]
+    rank = list(groups_)
+    for i, ks in sorted(kept.items(), key=lambda x: rank.index(bullets[x[0]]["group"])):
+        g = groups_[bullets[i]["group"]]
+        label, pop = g["label"], g["ks"]
         text = bullets[i]["text"]
         if 2 * len(ks) <= len(pop):
             text = MOSTLY.sub("", text)
         text = re.sub(r"^(?:you'd have|you would have)\s+", "", text, flags=re.I).rstrip(".")
         if not text.startswith(tuple(NAME.values())):
             text = text[0].lower() + text[1:]
-        out.append({"text": text, "tasks": ks, "group": label, "gid": bullets[i]["group"], "pair": bullets[i]["pair"]})
+        out.append({"text": text, "tasks": ks, "group": label, "gid": bullets[i]["group"], "pair": bullets[i]["pair"],
+                    "tag": g["tag"], "favor": g["favor"]})
     return out
 
 
@@ -638,25 +671,16 @@ def task_ref(text):
 
 
 def why_layout(why):
-    """[(kind, text, bullet, alternative provider's name)]: a "With R instead, you'd have:" header for the runner-up R,
-    its items, and the "though you'd have gained" line (kind "though", the one point in R's favor); then the same
-    header and item for each remaining provider, so every group renders alike."""
-    by = {b["gid"]: b for b in why}
-    out = []
-    items = [by[g] for g in ("missed", "wrong", "other") if g in by]
-    if items:
-        alt = NAME[items[0]["pair"][1]]
-        out.append(("head", f"With {alt} instead, you'd have:", None, alt))
-        out += [("item", b["text"], b, NAME[b["pair"][1]]) for b in items]
-        if "gave" in by:
-            out.append(("though", f"though you'd have {by['gave']['text']}.", by["gave"], alt))
-    elif "gave" in by:
-        alt = NAME[by["gave"]["pair"][1]]
-        out += [("head", f"With {alt} instead, you'd have:", None, alt), ("item", by["gave"]["text"], by["gave"], alt)]
-    for g, b in by.items():
-        if g.startswith("vs-"):
-            alt = NAME[g[3:]]
-            out += [("head", f"With {alt} instead, you'd have:", None, alt), ("item", b["text"], b, alt)]
+    """[(kind, text, bullet, alternative provider's name)]: per compared provider, a "With X instead, you'd have:"
+    header, its items, then the point in its favor (kind "though") unless it is the only one."""
+    out, alt = [], None
+    for b in why:
+        if NAME[b["pair"][1]] != alt:
+            alt = NAME[b["pair"][1]]
+            out.append(("head", f"With {alt} instead, you'd have:", None, alt))
+        lone = out[-1][0] == "head" and not any(x is not b and x["pair"] == b["pair"] for x in why)
+        out.append(("though", f"though you'd have {b['text']}", b, alt) if b["favor"] and not lone
+                   else ("item", b["text"], b, alt))
     return out
 
 
@@ -671,7 +695,7 @@ def why_groups(why):
             out[-1]["head"] = text
         else:
             out[-1]["items"].append({"text": task_ref(text), "also": [k for k in b["tasks"] if k not in EXAMPLE.findall(text)],
-                                     "favor": kind == "though"})
+                                     "favor": kind == "though", "tag": b["tag"]})
     return out
 
 
@@ -680,7 +704,7 @@ def legend(has_bill, has_usd):
     parts = [("Ranked best", "tasks where the judge ranked this provider's answer first."),
              ("Recall", "how much of what a complete answer needs (pooled from all providers' results) this provider's "
                         "results held, 0 to 4, averaged."),
-             ("Wrong (main / side)", "share of answers wrong on the main point / only on a side point.")]
+             ("Errors (main / side)", "share of answers with an error on the main point / only on a side point.")]
     if has_bill:
         parts.append(("Monthly cost", "what you'd pay a month at your volume (research tasks per month in your "
                                       "transcripts) after the provider's free tier."))
@@ -720,7 +744,7 @@ def summary(T, dates, agg, pairs, order, why, verdict, pick, sample="", check=No
     fee = ("list fee per task", lambda e: usd(agg[e]["usd"]))
     cols = [("ranked best", lambda e: f"{count(agg[e]['best'])}/{n}"),
             ("recall", lambda e: f"{agg[e]['recall']:.1f}/4"),
-            ("wrong (main / side)", lambda e: f"{100 * agg[e]['main']:.0f}% / {100 * agg[e]['side']:.0f}%"),
+            ("errors (main / side)", lambda e: f"{100 * agg[e]['main']:.0f}% / {100 * agg[e]['side']:.0f}%"),
             *([("monthly cost", lambda e: pay(agg[e]))] if has_bill else [fee] if has_usd else []),
             ("context tokens", lambda e: fmt_k(agg[e]["tokens"])),
             ("time", lambda e: f"{agg[e]['secs']:.0f} s")]
@@ -744,7 +768,7 @@ def summary(T, dates, agg, pairs, order, why, verdict, pick, sample="", check=No
         term += ["", "Why"]
         for kind, text, b, _ in why_layout(why):
             text = task_ref(text)
-            term += wrap(text, "    ", "  - ") if kind == "item" else wrap(text)
+            term += wrap(text) if kind == "head" else wrap(f"[{b['tag']}] {text}", "    ", "  + " if kind == "though" else "  - ")
 
     md = [f"# {title}", "", sample, "", "## Verdict", "", verdict, "", *([fallback[0], ""] if fallback else []), "## Providers", "",
           "| Provider | " + " | ".join(h.capitalize() for h, _ in mcols) + " |", "|---|" + "--:|" * len(mcols)]
@@ -756,8 +780,7 @@ def summary(T, dates, agg, pairs, order, why, verdict, pick, sample="", check=No
     if why:
         md += ["", "## Why", ""]
         for kind, text, b, _ in why_layout(why):
-            md += ((([""] if md[-1] else []) + [text, ""]) if kind == "head" else [f"- {md_refs(text, b)}"]
-                   if kind == "item" else ["", md_refs(text, b)])
+            md += ((([""] if md[-1] else []) + [text, ""]) if kind == "head" else [f"- **{b['tag']}** · {md_refs(text, b)}"])
     md += ["", "## How the grades explain the ranking", "",
            "Each task where one answer was ranked above another, put in one bucket by the judge's own grades: more "
            "recall, fewer errors at equal recall, or the judge's call.", "",
@@ -876,7 +899,7 @@ The ranking decides every per-task outcome in this report. Recall and errors are
 - Ranked best: tasks where a provider's answer was ranked first.
 - Head to head: tasks where one provider's answer was ranked above another's.
 - Verdict: one LLM call reads every number in this report's summary (ranked best, recall, errors, ranked above and how the grades explain it, monthly cost after free tiers, keyless limits, context tokens, time) and each task with the judge's grades and notes. It picks the provider it judges would make Claude most useful to you, {base} included, weighing the metrics itself with no fixed thresholds, and names the runner-up. Code checks that every number the verdict cites is among the summary numbers in its input; otherwise it retries once. If it still fails, or the call fails, the report names the provider ranked best most often instead.
-- Why: code picks fixed sets of tasks that back the verdict: where the recommended provider was ranked above the runner-up with more recall, where the runner-up's answer had the worse error, where it was the judge's call, where the runner-up was ranked above, and where the recommended provider was ranked above the remaining one. An LLM names what made the difference in each set, from the judge's notes, with an example. A check call keeps only the tasks where each statement holds; a failing bullet is rewritten once and rechecked, or dropped. Each set needs at least {MIN_GROUP} tasks, and a statement is kept only if the check confirms it on at least {MIN_GROUP}; with fewer, the report has no Why section and says why.
+- Why: for each other provider, code picks fixed sets of tasks by the Providers table's columns: where the recommended provider had more recall, where only the other provider's answer had an error on the main point, or only on a side point, and where the judge ranked the recommended provider above on its own call. It keeps the columns where the recommended provider leads by the most tasks, plus the one column with the most tasks in the other provider's favor, {WHY_CAP} bullets at most, each tagged with its column. An LLM names what made the difference in each set, from the judge's notes, with an example. A check call keeps only the tasks where each statement holds; a failing bullet is rewritten once and rechecked, or dropped. A set needs at least {MIN_GROUP} tasks, and a statement is kept only if the check confirms it on at least {MIN_GROUP}; an error on the main point needs one. With none, the report has no Why section and says why.
 - How the grades explain the ranking: each task where one answer was ranked above another is put in one bucket by the judge's own grades. More recall: the higher-ranked run's evidence held more. Fewer errors: equal recall, and the lower-ranked answer had the worse error. Judge's call: everything else.
 {cost}- Context tokens: the size of the search and fetch results a run put into Claude's context, estimated at 4 characters per token. Time: the headless session's wall time, from task to final answer.
 """ + ("\n**How far each Why statement holds** (tasks where the check kept it, of the set it was written for)\n\n"
@@ -1126,11 +1149,11 @@ def write_why(cache, T, agg, order, w, r, model):
     groups_ = groups(T, agg, w, r)
     ctx = [f"# Recommended: {NAME[w]}; runner-up: {NAME[r]}", "",
            "# How the grades explain the ranking", *computed(T, order, len(T)), ""]
-    for g, (label, ks, frame, pair) in groups_.items():
-        ctx += [f"# Group {g}: {label}", f"Bullet frame: {frame}", ""]
-        for k in ks:
+    for gid, g in groups_.items():
+        ctx += [f"# Group {gid}: {g['label']}", f"Bullet frame: {g['frame']}", ""]
+        for k in g["ks"]:
             ctx += [f"## Task {k}: {T[k]['task']['task']}", *task_facts(T[k], order), *judge_notes(T[k]),
-                    *provider_notes(T[k], pair), ""]
+                    *provider_notes(T[k], g["pair"]), ""]
     ctx += ["# All tasks (for titles)", *(f"- Task {k}: {' '.join(t['task']['task'].split())[:300]}" for k, t in T.items())]
     prompt, system = "\n".join(ctx), (PROMPTS / "report.md").read_text()
     out = cached(cache, [system, prompt], model, lambda: ask(prompt, system, WHY_SCHEMA, model))
