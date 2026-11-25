@@ -234,8 +234,20 @@ ul,ol{padding-left:22px}li{margin:5px 0}
  h2,h3,.why-head,summary{break-after:avoid}
  .why li,.vs,tr,.verdict,.errs li,.diagram{break-inside:avoid}.ex a.tlink{background:none;padding:0}}
 """ + STACK.format(name="task", width="40rem") + """
-@container task (width < 40rem){.task tr{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px;padding:12px 0}
- .task td::before{font-size:.72rem}}
+@container task (width < 40rem){
+ .task tr{grid-template-columns:1.9rem 6.6rem 1fr auto;grid-template-areas:"rk nm nm er" ". rc rc rc" ". cx tm tm";
+  gap:6px 10px;align-items:center;padding:14px 0}
+ .task tbody th{grid-area:nm;grid-column:auto;font-size:1rem;white-space:nowrap}
+ .task .chip.none{font-size:0}.task .chip.none::after{content:"no error";font-size:.82rem}
+ .task td:nth-of-type(1){grid-area:rk}.task td:nth-of-type(2){grid-area:rc}
+ .task td:nth-of-type(3){grid-area:er;justify-self:end}.task td:nth-of-type(4){grid-area:cx}.task td:nth-of-type(5){grid-area:tm}
+ .task td:nth-of-type(n+2)::before{display:inline;margin:0 6px 0 0;font-size:.8rem}
+ .task td:nth-of-type(1)::before,.task td:nth-of-type(3)::before{display:none}
+ .task td:nth-of-type(2){display:flex;align-items:center}
+ .task td:nth-of-type(2) .meter{display:inline-grid;grid-template-columns:2.2rem minmax(0,8rem);gap:8px;width:auto;align-items:center}
+ .task td:nth-of-type(2) .meter i{max-width:none}
+ .task td:nth-of-type(4),.task td:nth-of-type(5){color:var(--muted);font-size:.88rem}
+ .task td:nth-of-type(5)::before{content:"· " attr(data-label)}.task td:nth-of-type(5){margin-left:-4px}}
 """
 
 JS = """
