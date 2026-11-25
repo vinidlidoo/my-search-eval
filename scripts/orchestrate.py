@@ -60,8 +60,8 @@ KEEP_FILES = {"report.html", "report.md", "terminal.txt", "method.svg", "results
               "config.json", "progress.json"}  # what log pruning and --purge keep: the reports, and what dates the run
 RATE_STOP = 2  # refusals from one provider's rate limit, across the run, that stop replaying
 PHASES = ["instructions", "build", "replay", "judge", "report"]
-# From test runs on Opus: minutes per call, for the plan's time estimate.
-MIN_RUN, MIN_JUDGE, MIN_BUILD, MIN_REPORT = 1.5, 1.0, 1.5, 3.0
+# Wall time on Opus, fit to two runs (10 tasks: 14 min; 30 tasks: 25 min): fixed minutes + minutes per task.
+MIN_FIXED, MIN_PER_TASK = 8.0, 0.57
 RUN = "/my-search-eval:run"
 RESUME = "/my-search-eval:run --resume"
 TRANSCRIPTS_HINT = ("Claude Code deletes transcripts after 30 days by default; raise \"cleanupPeriodDays\" in "
@@ -180,7 +180,7 @@ def plan(want, pool, has_instr, sub, quick):
     batches = -(-int(n * build.OVERSAMPLE + 0.999) // build.BATCH)
     runs, judges = n * len(PROVIDERS), n
     calls = batches + (len(PROVIDERS) if has_instr else 0) + runs + judges + 4
-    minutes = (batches * MIN_BUILD + runs * MIN_RUN + judges * MIN_JUDGE) / WORKERS + MIN_REPORT
+    minutes = MIN_FIXED + n * MIN_PER_TASK
     names = ", ".join(v["name"] + (" (baseline)" if v.get("baseline") else " (keyless MCP)")
                       for v in PROVIDER_INFO.values())
     when = f"{minutes / 60:.1f} hours" if minutes >= 90 else f"{minutes:.0f} minutes"

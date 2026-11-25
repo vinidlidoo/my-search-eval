@@ -4,7 +4,7 @@ Which search provider makes Claude more useful for you, judged on your own past 
 
 Public search benchmarks use someone else's questions. Your best provider depends on what you research: docs and changelogs, prices, papers, news. This Claude Code plugin replays the research you already did in Claude Code on Exa, Parallel and Claude Code's built-in search, has Claude judge the answers blind, and recommends one provider with the reasons.
 
-One command. About 25 minutes (`--quick`) to an hour in the background. Runs on your Claude subscription.
+One command. About 15 minutes (`--quick`) to 25 minutes in the background. Runs on your Claude subscription.
 
 ## What you get
 
@@ -72,8 +72,8 @@ Tested on macOS only; Linux and WSL should work but are untested. Not native Win
 
 | | Tasks | Model runs | Wall time |
 |---|--:|--:|--:|
-| `--quick` | 10 | about 50 | about 25 minutes |
-| default | 30 | about 135 | about 1 hour |
+| `--quick` | 10 | about 50 | about 15 minutes |
+| default | 30 | about 135 | about 25 minutes |
 
 Usage counts against your plan's limits, with no API charges. The plan, with these numbers for your run, prints as the run starts.
 
